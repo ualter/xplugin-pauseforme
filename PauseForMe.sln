@@ -1,0 +1,31 @@
+﻿
+Microsoft Visual Studio Solution File, Format Version 12.00
+# Visual Studio 15
+VisualStudioVersion = 15.0.28010.2016
+MinimumVisualStudioVersion = 10.0.40219.1
+Project("{8BC9CEB8-8B4A-11D0-8D11-00A0C91BC942}") = "PauseForMe", "PauseForMe\PauseForMe.vcxproj", "{C546BDF8-BD66-40CC-9C50-84F35D80C051}"
+EndProject
+Global
+	GlobalSection(SolutionConfigurationPlatforms) = preSolution
+		Debug|Win32 = Debug|Win32
+		Debug|x64 = Debug|x64
+		Release|Win32 = Release|Win32
+		Release|x64 = Release|x64
+	EndGlobalSection
+	GlobalSection(ProjectConfigurationPlatforms) = postSolution
+		{C546BDF8-BD66-40CC-9C50-84F35D80C051}.Debug|Win32.ActiveCfg = Debug|x64
+		{C546BDF8-BD66-40CC-9C50-84F35D80C051}.Debug|Win32.Build.0 = Debug|x64
+		{C546BDF8-BD66-40CC-9C50-84F35D80C051}.Debug|x64.ActiveCfg = Debug|x64
+		{C546BDF8-BD66-40CC-9C50-84F35D80C051}.Debug|x64.Build.0 = Debug|x64
+		{C546BDF8-BD66-40CC-9C50-84F35D80C051}.Release|Win32.ActiveCfg = Release|Win32
+		{C546BDF8-BD66-40CC-9C50-84F35D80C051}.Release|Win32.Build.0 = Release|Win32
+		{C546BDF8-BD66-40CC-9C50-84F35D80C051}.Release|x64.ActiveCfg = Release|x64
+		{C546BDF8-BD66-40CC-9C50-84F35D80C051}.Release|x64.Build.0 = Release|x64
+	EndGlobalSection
+	GlobalSection(SolutionProperties) = preSolution
+		HideSolutionNode = FALSE
+	EndGlobalSection
+	GlobalSection(ExtensibilityGlobals) = postSolution
+		SolutionGuid = {34987204-A393-44C3-8CF7-A39D2353D15C}
+	EndGlobalSection
+EndGlobal
