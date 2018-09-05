@@ -852,15 +852,11 @@ void CreateWidgetWindow()
 
 
 	//**** Position Click wChkNavaidDME
-	int outLeft, outTop, outRight, outBottom;
-	XPGetWidgetExposedGeometry(wChkNavaidDME, outLeft, outTop, outRight, outBottom);
-	XPLMDebugString("--- aqui XPGetWidgetExposedGeometry wChkNavaidDME ---");
-	XPLMDebugString(convertToString(outLeft).c_str());
-	XPLMDebugString(convertToString(outTop).c_str());
-	XPLMDebugString(convertToString(outRight).c_str());
-	XPLMDebugString(convertToString(outBottom).c_str());
-	XPLMDebugString("--- aqui ---");
-	//**** End Position Click wChkNavaidDME
+	//int *outLeft = 0, *outTop = 0, *outRight = 0, *outBottom = 0;
+	//XPGetWidgetExposedGeometry(wChkNavaidDME, outLeft, outTop, outRight, outBottom);
+	//XPLMDebugString("--- aqui XPGetWidgetExposedGeometry wChkNavaidDME ---");
+	//XPLMDebugString("--- aqui ---");
+	////**** End Position Click wChkNavaidDME
 
 
 	//*********************************************************************************************************************************
@@ -890,20 +886,20 @@ void CreateWidgetWindow()
 	//*********************************************************************************************************************************
 	//*********************************************************************************************************************************
 	// Button Reload
-	/*leftX += 100;
+	leftX += 100;
 	bottomY = topY-heightFields;
 	wBtnReload = XPCreateWidget(leftX, topY-5, leftX+40, bottomY,1,"Reload",0,wMainWindow,xpWidgetClass_Button);
-	XPSetWidgetProperty(wBtnReload,xpProperty_ButtonType,xpPushButton);*/
+	XPSetWidgetProperty(wBtnReload,xpProperty_ButtonType,xpPushButton);
 
 	// Just For Debug Purposes
-	/*topY -= 15;
+	topY -= 15;
 	bottomY = topY-heightFields;
 	leftX   = x+leftMargin;
 	widgetDebug1 = XPCreateWidget(leftX, topY, leftX+80, bottomY,1,"Debug1!",0,wMainWindow,xpWidgetClass_Caption);
 	leftX += 160;
 	widgetDebug2 = XPCreateWidget(leftX, topY, leftX+80, bottomY,1,"Debug2!",0,wMainWindow,xpWidgetClass_Caption);
 	leftX += 160;
-	widgetDebug3 = XPCreateWidget(leftX, topY, leftX+80, bottomY,1,"Debug3!",0,wMainWindow,xpWidgetClass_Caption);*/
+	widgetDebug3 = XPCreateWidget(leftX, topY, leftX+80, bottomY,1,"Debug3!",0,wMainWindow,xpWidgetClass_Caption);
 
 	XPAddWidgetCallback(wMainWindow, widgetWidgetHandler);
 }
@@ -1246,7 +1242,7 @@ navaid setInfoNavaid(int sizeCheck, XPWidgetID textId, XPWidgetID captionDistanc
 		if (navaidTarget.statusOK == 1) {
 			float distanceNavs = navManager.calculateDistanceBetweenNavaids(navCurrent, navaidTarget);
 			navaidTarget.distance = distanceNavs;
-			sprintf(label, "%snm", convertToString(distanceNavs));
+			sprintf(label, "%snm", convertToString(distanceNavs).c_str());
 			XPSetWidgetDescriptor(captionDistance, label);
 			XPSetWidgetDescriptor(captionDesc, navaidTarget.name.c_str());
 		}
@@ -1540,8 +1536,8 @@ float pauseXPlane() {
 	}
 	if (isNavaidAirportSelected) {
 		if (userNavaidAirportDistance >= navaidAirport.distance) {
-			sprintf(msgPause, "Distance Airport %s-%s (%s <= %s)", navaidAirport.id, navaidAirport.name,
-				convertToString(navaidAirport.distance),convertToString(userNavaidAirportDistance));
+			sprintf(msgPause, "Distance Airport %s-%s (%s <= %s)", navaidAirport.id.c_str(), navaidAirport.name.c_str(),
+				convertToString(navaidAirport.distance).c_str(),convertToString(userNavaidAirportDistance).c_str());
 			result = 1;
 			wChkToUnSelect = wChkNavaidAirport;
 			isNavaidAirportSelected = 0;
@@ -1549,8 +1545,8 @@ float pauseXPlane() {
 	}
 	if (isNavaidVORSelected) {
 		if (userNavaidVORDistance >= navaidVOR.distance) {
-			sprintf(msgPause, "Distance VOR %s-%s (%s <= %s)", navaidVOR.id, navaidVOR.name,
-				convertToString(navaidVOR.distance), convertToString(userNavaidVORDistance));
+			sprintf(msgPause, "Distance VOR %s-%s (%s <= %s)", navaidVOR.id.c_str(), navaidVOR.name.c_str(),
+				convertToString(navaidVOR.distance).c_str(), convertToString(userNavaidVORDistance).c_str());
 			result = 1;
 			wChkToUnSelect = wChkNavaidVOR;
 			isNavaidVORSelected = 0;
@@ -1558,8 +1554,8 @@ float pauseXPlane() {
 	}
 	if (isNavaidNDBSelected) {
 		if (userNavaidNDBDistance >= navaidNDB.distance) {
-			sprintf(msgPause, "Distance NDB %s-%s (%s <= %s)", navaidNDB.id, navaidNDB.name,
-				convertToString(navaidNDB.distance), convertToString(userNavaidNDBDistance));
+			sprintf(msgPause, "Distance NDB %s-%s (%s <= %s)", navaidNDB.id.c_str(), navaidNDB.name.c_str(),
+				convertToString(navaidNDB.distance).c_str(), convertToString(userNavaidNDBDistance).c_str());
 			result = 1;
 			wChkToUnSelect = wChkNavaidNDB;
 			isNavaidNDBSelected = 0;
@@ -1567,8 +1563,8 @@ float pauseXPlane() {
 	}
 	if (isNavaidFixSelected) {
 		if (userNavaidFixDistance >= navaidFix.distance) {
-			sprintf(msgPause, "Distance Fix %s-%s (%s <= %s)", navaidFix.id, navaidFix.name,
-				convertToString(navaidFix.distance), convertToString(userNavaidFixDistance));
+			sprintf(msgPause, "Distance Fix %s-%s (%s <= %s)", navaidFix.id.c_str(), navaidFix.name.c_str(),
+				convertToString(navaidFix.distance).c_str(), convertToString(userNavaidFixDistance).c_str());
 			result = 1;
 			wChkToUnSelect = wChkNavaidFix;
 			isNavaidFixSelected = 0;
@@ -1576,8 +1572,8 @@ float pauseXPlane() {
 	}
 	if (isNavaidDMESelected) {
 		if (userNavaidDMEDistance >= navaidDME.distance) {
-			sprintf(msgPause, "Distance DME %s-%s (%s <= %s)", navaidDME.id, navaidDME.name,
-				convertToString(navaidDME.distance), convertToString(userNavaidDMEDistance));
+			sprintf(msgPause, "Distance DME %s-%s (%s <= %s)", navaidDME.id.c_str(), navaidDME.name.c_str(),
+				convertToString(navaidDME.distance).c_str(), convertToString(userNavaidDMEDistance).c_str());
 			result = 1;
 			wChkToUnSelect = wChkNavaidDME;
 			isNavaidDMESelected = 0;
