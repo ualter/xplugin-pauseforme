@@ -807,7 +807,7 @@ void CreateWidgetWindow()
 	//// DME Navaid Line
 	leftX = tmpX;
 	//topY -= 10;
-	//topY -= 20;
+	topY -= 20;
 	wChkNavaidDME = XPCreateWidget(leftX, topY, leftX + widthField, bottomY - 28, 1, "", 0, wMainWindow, xpWidgetClass_Button);
 	XPSetWidgetProperty(wChkNavaidDME, xpProperty_ButtonType, xpRadioButton);
 	XPSetWidgetProperty(wChkNavaidDME, xpProperty_ButtonBehavior, xpButtonBehaviorCheckBox);
