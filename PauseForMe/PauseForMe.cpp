@@ -6,7 +6,7 @@
 * - Max/Min Distance to DME (Nav1/Nav2/GPS);
 * - Max/Min Time to DME (Nav1/Nav2/GPS);
 * - Max/Min Altitude;
-* - Max/Min Airspeed; or…
+* - Max/Min Airspeed; orï¿½
 * - Alignment with a radial signal (Nav1/Nav2)
 *
 * What comes first it will trigger the PAUSE. Then, you have the chance to get back the command from the autopilot from that
@@ -14,7 +14,7 @@
 *
 * You could use it while doing another things on computer, like programming your favourite language, or check out what your 8-years-old-boy
 * wants with you, or simply to have a shower, a snack! :-)  I hope it helps, I did it just for fun and because it was features that I was
-* looking for on a plugin, and as I did not find… I decide to write this one.
+* looking for on a plugin, and as I did not findï¿½ I decide to write this one.
 *
 * Any doubts or problems you can reach me at my e-mail(below), as soon as I have free time I promised to correct the bugs you found! ;-)
 * Please in case you found any bugs, send me also information of the conditions that it happened. And of course, if you have any ideias to
@@ -806,11 +806,23 @@ void CreateWidgetWindow()
 	topY += 3;
 	//// DME Navaid Line
 	leftX = tmpX;
-	topY -= 10;
+	//topY -= 10;
+	//topY -= 20;
 	wChkNavaidDME = XPCreateWidget(leftX, topY, leftX + widthField, bottomY - 28, 1, "", 0, wMainWindow, xpWidgetClass_Button);
 	XPSetWidgetProperty(wChkNavaidDME, xpProperty_ButtonType, xpRadioButton);
 	XPSetWidgetProperty(wChkNavaidDME, xpProperty_ButtonBehavior, xpButtonBehaviorCheckBox);
 	XPSetWidgetProperty(wChkNavaidDME, xpProperty_ButtonState, isNavaidDMESelected);
+
+	//** Print Position Widget
+	XPLMDebugString("--- aqui Position  wChkNavaidDME ---");
+	XPLMDebugString(convertToString(leftX).c_str());
+	XPLMDebugString(convertToString(topY).c_str());
+	XPLMDebugString(convertToString(leftX + widthField).c_str());
+	XPLMDebugString(convertToString(bottomY - 28).c_str());
+	XPLMDebugString("--- aqui ---");
+	//** End Print Position Widget
+
+
 	leftX += 35;
 	topY -= 7;
 	bottomY = topY - 8;
@@ -837,6 +849,19 @@ void CreateWidgetWindow()
 	wCaptionNavaidDMEDesc = XPCreateWidget(leftX, topY, leftX + 10, bottomY, 1, "-----", 0, wMainWindow, xpWidgetClass_Caption);
 	XPSetWidgetProperty(wCaptionNavaidDMEDesc, xpProperty_CaptionLit, 0);
 	topY += 3;
+
+
+	//**** Position Click wChkNavaidDME
+	int outLeft, outTop, outRight, outBottom;
+	XPGetWidgetExposedGeometry(wChkNavaidDME, outLeft, outTop, outRight, outBottom);
+	XPLMDebugString("--- aqui XPGetWidgetExposedGeometry wChkNavaidDME ---");
+	XPLMDebugString(convertToString(outLeft).c_str());
+	XPLMDebugString(convertToString(outTop).c_str());
+	XPLMDebugString(convertToString(outRight).c_str());
+	XPLMDebugString(convertToString(outBottom).c_str());
+	XPLMDebugString("--- aqui ---");
+	//**** End Position Click wChkNavaidDME
+
 
 	//*********************************************************************************************************************************
 
