@@ -39,7 +39,7 @@
 #define APL 0
 #define IBM 1
 
-#define XPLM200 = 1;  // This example requires SDK2.0
+//#define XPLM200 = 1;  // This example requires SDK2.0
 
 #pragma warning(disable: 4996)
 #pragma warning(disable: 4244)
@@ -66,6 +66,22 @@
 #include "Coordenada.h"
 #include "NavaidManager.h"
 #include "Navaid.h"
+
+#if IBM
+    #include <windows.h>
+#endif
+#if LIN
+    #include <GL/gl.h>
+#elif __GNUC__
+    #include <OpenGL/gl.h>
+#else
+    #include <GL/gl.h>
+#endif
+
+#ifndef XPLM300
+    #error This is made to be compiled against the XPLM301 SDK
+#endif
+
 
 #undef NULL
 #ifdef __cplusplus
@@ -305,17 +321,27 @@ std::string formatNumber(float number, int decimal)
 	return ret;
 }
 
+// An opaque handle to the window we will create
+static XPLMWindowID	g_window;
+
+// Callbacks we will register when we create our window
+void				draw_hello_world(XPLMWindowID in_window_id, void * in_refcon);
+int					dummy_mouse_handler(XPLMWindowID in_window_id, int x, int y, int is_down, void * in_refcon) { return 0; }
+XPLMCursorStatus	dummy_cursor_status_handler(XPLMWindowID in_window_id, int x, int y, void * in_refcon) { return xplm_CursorDefault; }
+int					dummy_wheel_handler(XPLMWindowID in_window_id, int x, int y, int wheel, int clicks, void * in_refcon) { return 0; }
+void				dummy_key_handler(XPLMWindowID in_window_id, char key, XPLMKeyFlags flags, char virtual_key, void * in_refcon, int losing_focus) { }
+
 void CreateWidgetWindow()
 {
 	int x = 150;
 	int y = 850;
 	int w = 820;
-	int h = 455;
+	int h = 555;
 
 	int x2 = x + w;
 	int y2 = y - h;
 
-	wMainWindow = XPCreateWidget(x, y, x2, y2, 1, "Pause For Me / v2.6", 1, NULL, xpWidgetClass_MainWindow);
+	wMainWindow = XPCreateWidget(x, y, x2, y2, 1, "Pause For Me / v2.8", 1, NULL, xpWidgetClass_MainWindow);
 	XPSetWidgetProperty(wMainWindow, xpProperty_MainWindowHasCloseBoxes, 1);
 
 	// Window
@@ -686,7 +712,7 @@ void CreateWidgetWindow()
 	leftX += 44;
 	topY += 5;
 	bottomY = topY - heightFields;
-	wTextNavaidAirportID = XPCreateWidget(leftX, topY, leftX + 55, bottomY, 1, userNavaidAirportID.c_str(), 0, wMainWindow, xpWidgetClass_TextField);
+	wTextNavaidAirportID = XPCreateWidget(leftX + 5, topY, leftX + 55, bottomY, 1, userNavaidAirportID.c_str(), 0, wMainWindow, xpWidgetClass_TextField);
 	XPSetWidgetProperty(wTextNavaidAirportID, xpProperty_TextFieldType, xpTextEntryField);
 	XPSetWidgetProperty(wTextNavaidAirportID, xpProperty_MaxCharacters, 7);
 	leftX += 60;
@@ -698,7 +724,7 @@ void CreateWidgetWindow()
 	leftX += 23;
 	topY -= 3;
 	bottomY = topY - heightFields;
-	wTextNavaidAirportDistanceMin = XPCreateWidget(leftX, topY, leftX + 55, bottomY, 1, convertToString(userNavaidAirportDistance).c_str(), 0, wMainWindow, xpWidgetClass_TextField);
+	wTextNavaidAirportDistanceMin = XPCreateWidget(leftX + 5, topY, leftX + 55, bottomY, 1, convertToString(userNavaidAirportDistance).c_str(), 0, wMainWindow, xpWidgetClass_TextField);
 	XPSetWidgetProperty(wTextNavaidAirportDistanceMin, xpProperty_TextFieldType, xpTextEntryField);
 	XPSetWidgetProperty(wTextNavaidAirportDistanceMin, xpProperty_MaxCharacters, 7);
 	leftX += 55;
@@ -707,8 +733,8 @@ void CreateWidgetWindow()
 	topY += 3;
 	// VOR Navaid Line
 	leftX = tmpX;
-	topY -= 10;
-	wChkNavaidVOR = XPCreateWidget(leftX, topY, leftX + widthField, bottomY - 28, 1, "", 0, wMainWindow, xpWidgetClass_Button);
+	topY -= 20;
+	wChkNavaidVOR = XPCreateWidget(leftX, topY, leftX + widthField, bottomY - 39, 1, "", 0, wMainWindow, xpWidgetClass_Button);
 	XPSetWidgetProperty(wChkNavaidVOR, xpProperty_ButtonType, xpRadioButton);
 	XPSetWidgetProperty(wChkNavaidVOR, xpProperty_ButtonBehavior, xpButtonBehaviorCheckBox);
 	XPSetWidgetProperty(wChkNavaidVOR, xpProperty_ButtonState, isNavaidVORSelected);
@@ -719,7 +745,7 @@ void CreateWidgetWindow()
 	leftX += 44;
 	topY -= 3;
 	bottomY = topY - heightFields;
-	wTextNavaidVORID = XPCreateWidget(leftX, topY, leftX + 55, bottomY, 1, userNavaidVORID.c_str(), 0, wMainWindow, xpWidgetClass_TextField);
+	wTextNavaidVORID = XPCreateWidget(leftX + 5, topY, leftX + 55, bottomY, 1, userNavaidVORID.c_str(), 0, wMainWindow, xpWidgetClass_TextField);
 	XPSetWidgetProperty(wTextNavaidVORID, xpProperty_TextFieldType, xpTextEntryField);
 	XPSetWidgetProperty(wTextNavaidVORID, xpProperty_MaxCharacters, 7);
 	leftX += 60;
@@ -731,7 +757,7 @@ void CreateWidgetWindow()
 	leftX += 23;
 	topY -= 3;
 	bottomY = topY - heightFields;
-	wTextNavaidVORDistanceMin = XPCreateWidget(leftX, topY, leftX + 55, bottomY, 1, convertToString(userNavaidVORDistance).c_str(), 0, wMainWindow, xpWidgetClass_TextField);
+	wTextNavaidVORDistanceMin = XPCreateWidget(leftX + 5, topY, leftX + 55, bottomY, 1, convertToString(userNavaidVORDistance).c_str(), 0, wMainWindow, xpWidgetClass_TextField);
 	XPSetWidgetProperty(wTextNavaidVORDistanceMin, xpProperty_TextFieldType, xpTextEntryField);
 	XPSetWidgetProperty(wTextNavaidVORDistanceMin, xpProperty_MaxCharacters, 7);
 	leftX += 55;
@@ -740,8 +766,8 @@ void CreateWidgetWindow()
 	topY += 3;
 	// NDB Navaid Line
 	leftX = tmpX;
-	topY -= 10;
-	wChkNavaidNDB = XPCreateWidget(leftX, topY, leftX + widthField, bottomY - 28, 1, "", 0, wMainWindow, xpWidgetClass_Button);
+	topY -= 20;
+	wChkNavaidNDB = XPCreateWidget(leftX, topY, leftX + widthField, bottomY - 39, 1, "", 0, wMainWindow, xpWidgetClass_Button);
 	XPSetWidgetProperty(wChkNavaidNDB, xpProperty_ButtonType, xpRadioButton);
 	XPSetWidgetProperty(wChkNavaidNDB, xpProperty_ButtonBehavior, xpButtonBehaviorCheckBox);
 	XPSetWidgetProperty(wChkNavaidNDB, xpProperty_ButtonState, isNavaidNDBSelected);
@@ -752,7 +778,7 @@ void CreateWidgetWindow()
 	leftX += 44;
 	topY -= 3;
 	bottomY = topY - heightFields;
-	wTextNavaidNDBID = XPCreateWidget(leftX, topY, leftX + 55, bottomY, 1, userNavaidNDBID.c_str(), 0, wMainWindow, xpWidgetClass_TextField);
+	wTextNavaidNDBID = XPCreateWidget(leftX + 5, topY, leftX + 55, bottomY, 1, userNavaidNDBID.c_str(), 0, wMainWindow, xpWidgetClass_TextField);
 	XPSetWidgetProperty(wTextNavaidNDBID, xpProperty_TextFieldType, xpTextEntryField);
 	XPSetWidgetProperty(wTextNavaidNDBID, xpProperty_MaxCharacters, 7);
 	leftX += 60;
@@ -764,7 +790,7 @@ void CreateWidgetWindow()
 	leftX += 23;
 	topY -= 3;
 	bottomY = topY - heightFields;
-	wTextNavaidNDBDistanceMin = XPCreateWidget(leftX, topY, leftX + 55, bottomY, 1, convertToString(userNavaidNDBDistance).c_str(), 0, wMainWindow, xpWidgetClass_TextField);
+	wTextNavaidNDBDistanceMin = XPCreateWidget(leftX + 5, topY, leftX + 55, bottomY, 1, convertToString(userNavaidNDBDistance).c_str(), 0, wMainWindow, xpWidgetClass_TextField);
 	XPSetWidgetProperty(wTextNavaidNDBDistanceMin, xpProperty_TextFieldType, xpTextEntryField);
 	XPSetWidgetProperty(wTextNavaidNDBDistanceMin, xpProperty_MaxCharacters, 7);
 	leftX += 55;
@@ -773,8 +799,8 @@ void CreateWidgetWindow()
 	topY += 3;
 	// Fix Navaid Line
 	leftX = tmpX;
-	topY -= 10;
-	wChkNavaidFix = XPCreateWidget(leftX, topY, leftX + widthField, bottomY - 28, 1, "", 0, wMainWindow, xpWidgetClass_Button);
+	topY -= 20;
+	wChkNavaidFix = XPCreateWidget(leftX, topY, leftX + widthField, bottomY - 39, 1, "", 0, wMainWindow, xpWidgetClass_Button);
 	XPSetWidgetProperty(wChkNavaidFix, xpProperty_ButtonType, xpRadioButton);
 	XPSetWidgetProperty(wChkNavaidFix, xpProperty_ButtonBehavior, xpButtonBehaviorCheckBox);
 	XPSetWidgetProperty(wChkNavaidFix, xpProperty_ButtonState, isNavaidFixSelected);
@@ -785,7 +811,7 @@ void CreateWidgetWindow()
 	leftX += 44;
 	topY -= 3;
 	bottomY = topY - heightFields;
-	wTextNavaidFixID = XPCreateWidget(leftX, topY, leftX + 55, bottomY, 1, userNavaidFixID.c_str(), 0, wMainWindow, xpWidgetClass_TextField);
+	wTextNavaidFixID = XPCreateWidget(leftX + 5, topY, leftX + 55, bottomY, 1, userNavaidFixID.c_str(), 0, wMainWindow, xpWidgetClass_TextField);
 	XPSetWidgetProperty(wTextNavaidFixID, xpProperty_TextFieldType, xpTextEntryField);
 	XPSetWidgetProperty(wTextNavaidFixID, xpProperty_MaxCharacters, 7);
 	leftX += 60;
@@ -797,7 +823,7 @@ void CreateWidgetWindow()
 	leftX += 23;
 	topY -= 3;
 	bottomY = topY - heightFields;
-	wTextNavaidFixDistanceMin = XPCreateWidget(leftX, topY, leftX + 55, bottomY, 1, convertToString(userNavaidFixDistance).c_str(), 0, wMainWindow, xpWidgetClass_TextField);
+	wTextNavaidFixDistanceMin = XPCreateWidget(leftX + 5, topY, leftX + 55, bottomY, 1, convertToString(userNavaidFixDistance).c_str(), 0, wMainWindow, xpWidgetClass_TextField);
 	XPSetWidgetProperty(wTextNavaidFixDistanceMin, xpProperty_TextFieldType, xpTextEntryField);
 	XPSetWidgetProperty(wTextNavaidFixDistanceMin, xpProperty_MaxCharacters, 7);
 	leftX += 55;
@@ -808,19 +834,22 @@ void CreateWidgetWindow()
 	leftX = tmpX;
 	//topY -= 10;
 	topY -= 20;
-	wChkNavaidDME = XPCreateWidget(leftX, topY, leftX + widthField, bottomY - 28, 1, "", 0, wMainWindow, xpWidgetClass_Button);
+	wChkNavaidDME = XPCreateWidget(leftX, topY - 9, leftX + widthField, bottomY - 29, 1, "", 0, wMainWindow, xpWidgetClass_Button);
 	XPSetWidgetProperty(wChkNavaidDME, xpProperty_ButtonType, xpRadioButton);
 	XPSetWidgetProperty(wChkNavaidDME, xpProperty_ButtonBehavior, xpButtonBehaviorCheckBox);
 	XPSetWidgetProperty(wChkNavaidDME, xpProperty_ButtonState, isNavaidDMESelected);
 
 	//** Print Position Widget
-	XPLMDebugString("--- aqui Position  wChkNavaidDME ---");
-	XPLMDebugString(convertToString(leftX).c_str());
-	XPLMDebugString(convertToString(topY).c_str());
-	XPLMDebugString(convertToString(leftX + widthField).c_str());
-	XPLMDebugString(convertToString(bottomY - 28).c_str());
-	XPLMDebugString("--- aqui ---");
-	//** End Print Position Widget
+	//XPLMDebugString("--- aqui Position  wChkNavaidDME ---");
+	//XPLMDebugString(convertToString(leftX).c_str());
+	//XPLMDebugString(convertToString(topY).c_str());
+	//XPLMDebugString(convertToString(leftX + widthField).c_str());
+	//XPLMDebugString(convertToString(bottomY - 28).c_str());
+	//XPSetWidgetDescriptor(widgetDebug1, convertToString(bottomY - 28).c_str());
+	//XPLMDebugString("--- aqui ---");
+	////** End Print Position Widget
+
+	// Output Directory Backup value: .\Release\plugins\$(TargetName)\64\
 
 
 	leftX += 35;
@@ -830,7 +859,7 @@ void CreateWidgetWindow()
 	leftX += 44;
 	topY -= 3;
 	bottomY = topY - heightFields;
-	wTextNavaidDMEID = XPCreateWidget(leftX, topY, leftX + 55, bottomY, 1, userNavaidDMEID.c_str(), 0, wMainWindow, xpWidgetClass_TextField);
+	wTextNavaidDMEID = XPCreateWidget(leftX + 5, topY, leftX + 55, bottomY, 1, userNavaidDMEID.c_str(), 0, wMainWindow, xpWidgetClass_TextField);
 	XPSetWidgetProperty(wTextNavaidDMEID, xpProperty_TextFieldType, xpTextEntryField);
 	XPSetWidgetProperty(wTextNavaidDMEID, xpProperty_MaxCharacters, 7);
 	leftX += 60;
@@ -842,7 +871,7 @@ void CreateWidgetWindow()
 	leftX += 23;
 	topY -= 3;
 	bottomY = topY - heightFields;
-	wTextNavaidDMEDistanceMin = XPCreateWidget(leftX, topY, leftX + 55, bottomY, 1, convertToString(userNavaidDMEDistance).c_str(), 0, wMainWindow, xpWidgetClass_TextField);
+	wTextNavaidDMEDistanceMin = XPCreateWidget(leftX + 5, topY, leftX + 55, bottomY, 1, convertToString(userNavaidDMEDistance).c_str(), 0, wMainWindow, xpWidgetClass_TextField);
 	XPSetWidgetProperty(wTextNavaidDMEDistanceMin, xpProperty_TextFieldType, xpTextEntryField);
 	XPSetWidgetProperty(wTextNavaidDMEDistanceMin, xpProperty_MaxCharacters, 7);
 	leftX += 55;
@@ -850,13 +879,6 @@ void CreateWidgetWindow()
 	XPSetWidgetProperty(wCaptionNavaidDMEDesc, xpProperty_CaptionLit, 0);
 	topY += 3;
 
-
-	//**** Position Click wChkNavaidDME
-	//int *outLeft = 0, *outTop = 0, *outRight = 0, *outBottom = 0;
-	//XPGetWidgetExposedGeometry(wChkNavaidDME, outLeft, outTop, outRight, outBottom);
-	//XPLMDebugString("--- aqui XPGetWidgetExposedGeometry wChkNavaidDME ---");
-	//XPLMDebugString("--- aqui ---");
-	////**** End Position Click wChkNavaidDME
 
 
 	//*********************************************************************************************************************************
@@ -900,6 +922,24 @@ void CreateWidgetWindow()
 	widgetDebug2 = XPCreateWidget(leftX, topY, leftX+80, bottomY,1,"Debug2!",0,wMainWindow,xpWidgetClass_Caption);
 	leftX += 160;
 	widgetDebug3 = XPCreateWidget(leftX, topY, leftX+80, bottomY,1,"Debug3!",0,wMainWindow,xpWidgetClass_Caption);
+
+
+	XPLMCreateWindow_t params;
+	params.structSize = sizeof(params);
+	params.visible = 1;
+	params.drawWindowFunc = draw_hello_world;
+	// Note on "dummy" handlers:
+	// Even if we don't want to handle these events, we have to register a "do-nothing" callback for them
+	params.handleMouseClickFunc = dummy_mouse_handler;
+	params.handleRightClickFunc = dummy_mouse_handler;
+	params.handleMouseWheelFunc = dummy_wheel_handler;
+	params.handleKeyFunc = dummy_key_handler;
+	params.handleCursorFunc = dummy_cursor_status_handler;
+	params.refcon = NULL;
+	params.layer = xplm_WindowLayerFloatingWindows;
+	// Opt-in to styling our window like an X-Plane 11 native window
+	// If you're on XPLM300, not XPLM301, swap this enum for the literal value 1.
+	params.decorateAsFloatingWindow = xplm_WindowDecorationRoundRectangle;
 
 	XPAddWidgetCallback(wMainWindow, widgetWidgetHandler);
 }
@@ -1843,3 +1883,24 @@ int SetupOffCommandHandler(XPLMCommandRef inCommand, XPLMCommandPhase inPhase, v
 	return 0;
 }
 
+void	draw_hello_world(XPLMWindowID in_window_id, void * in_refcon)
+{
+	// Mandatory: We *must* set the OpenGL state before drawing
+	// (we can't make any assumptions about it)
+	XPLMSetGraphicsState(
+		0 /* no fog */,
+		0 /* 0 texture units */,
+		0 /* no lighting */,
+		0 /* no alpha testing */,
+		1 /* do alpha blend */,
+		1 /* do depth testing */,
+		0 /* no depth writing */
+	);
+
+	int l, t, r, b;
+	XPLMGetWindowGeometry(in_window_id, &l, &t, &r, &b);
+
+	float col_white[] = { 1.0, 1.0, 1.0 }; // red, green, blue
+
+	XPLMDrawString(col_white, l + 10, t - 20, "Hello world!", NULL, xplmFont_Proportional);
+}
