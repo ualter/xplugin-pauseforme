@@ -1750,8 +1750,6 @@ float pauseXPlane() {
 	if (isDataRef1Selected) {
 		result = checkDataRefs(1);
 		if (result == 1) {
-			sprintf(msgPause, "DataRef %s", dataRef1.c_str());
-				// convertToString(navaidDME.distance).c_str(), convertToString(userNavaidDMEDistance).c_str());
 			wChkToUnSelect     = wChkDataRef1;
 			isDataRef1Selected = 0;
 		}
@@ -1760,8 +1758,6 @@ float pauseXPlane() {
 	if (isDataRef2Selected) {
 		result = checkDataRefs(2);
 		if (result == 1) {
-			sprintf(msgPause, "DataRef %s", dataRef2.c_str());
-			// convertToString(navaidDME.distance).c_str(), convertToString(userNavaidDMEDistance).c_str());
 			wChkToUnSelect = wChkDataRef2;
 			isDataRef2Selected = 0;
 		}
@@ -1770,8 +1766,6 @@ float pauseXPlane() {
 	if (isDataRef3Selected) {
 		result = checkDataRefs(3);
 		if (result == 1) {
-			sprintf(msgPause, "DataRef %s", dataRef3.c_str());
-			// convertToString(navaidDME.distance).c_str(), convertToString(userNavaidDMEDistance).c_str());
 			wChkToUnSelect = wChkDataRef3;
 			isDataRef3Selected = 0;
 		}
@@ -1810,48 +1804,133 @@ int checkDataRefs(int number) {
 	XPGetWidgetDescriptor(wDataRef, b1, sizeof(b1));
 	XPGetWidgetDescriptor(wDataRefValue, b2, sizeof(b2));
 	
-	std::string s = b2;
+	std::string s      = b2;
+	std::string signal = "";
 	// Float or Int (if there's a point, so...  it is a Float value, otherwise it will be treated as a Integer)
 	if (s.find('.') != std::string::npos) {
 		float realDataRefValue   = XPLMGetDataf(XPLMFindDataRef(b1));
-		float wishedDataRefValue = convertToNumber(b2);
+		float wishedDataRefValue = 0;
+
 		XPSetWidgetDescriptor(debugId, std::to_string(realDataRefValue).c_str());
 
-		XPLMDebugString("---: number..: ");
-		XPLMDebugString(std::to_string(number).c_str());
-		XPLMDebugString("\n");
+		if (s.substr(0, 1) == "=") {
+			signal = "=";
+			wishedDataRefValue = convertToNumber(s.substr(1));
+			if (realDataRefValue == wishedDataRefValue) {
+				result = 1;
+			}
+		}
+		else
+		if (s.substr(0, 1) == ">" ) {
+			signal = ">";
+			wishedDataRefValue = convertToNumber(s.substr(1));
+			if (realDataRefValue > wishedDataRefValue) {
+				result = 1;
+			}
+		} else
+		if (s.substr(0, 1) == "<") {
+			signal = "<";
+			wishedDataRefValue = convertToNumber(s.substr(1));
+			if (realDataRefValue < wishedDataRefValue) {
+				result = 1;
+			}
+		}
+		else
+		if (s.substr(0, 1) == ">=") {
+			signal = ">=";
+			wishedDataRefValue = convertToNumber(s.substr(2));
+			if (realDataRefValue >= wishedDataRefValue) {
+				result = 1;
+			}
+		} 
+		else
+		if (s.substr(0, 1) == "<=") {
+			signal = "<=";
+			wishedDataRefValue = convertToNumber(s.substr(2));
+			if (realDataRefValue <= wishedDataRefValue) {
+				result = 1;
+			}
+		} else
+		if (s.substr(0, 1) == "<>") {
+			signal = "<>";
+			wishedDataRefValue = convertToNumber(s.substr(2));
+			if (realDataRefValue != wishedDataRefValue) {
+				result = 1;
+			}
+		} else {
+			signal = "=";
+			wishedDataRefValue = convertToNumber(s);
+			if (realDataRefValue == wishedDataRefValue) {
+				result = 1;
+			}
+		}
 
-		XPLMDebugString("---: realDataRefValue..: ");
-		XPLMDebugString(std::to_string(realDataRefValue).c_str());
-		XPLMDebugString("\n");
-
-		XPLMDebugString("---: wishedDataRefValue..: ");
-		XPLMDebugString(std::to_string(wishedDataRefValue).c_str());
-		XPLMDebugString("\n");
-
-		if (realDataRefValue == wishedDataRefValue) {
-			result = 1;
+		if (result == 1) {
+			sprintf(msgPause, "DataRef %s (%s %s %s)", b1, convertToString(realDataRefValue).c_str(), signal.c_str(), convertToString(wishedDataRefValue).c_str());
 		}
 	} else {
-		int   realDataRefValue = (int)XPLMGetDataf(XPLMFindDataRef(b1));
-		int   wishedDataRefValue = convertToNumber(b2);
+		int   realDataRefValue   = (int)XPLMGetDataf(XPLMFindDataRef(b1));
+		int   wishedDataRefValue = 0;
+
 		XPSetWidgetDescriptor(debugId, convertToString(realDataRefValue).c_str());
 
-		XPLMDebugString("---: number..: ");
-		XPLMDebugString(std::to_string(number).c_str());
-		XPLMDebugString("\n");
+		if (s.substr(0, 1) == "=") {
+			signal = "=";
+			wishedDataRefValue = convertToNumber(s.substr(1));
+			if (realDataRefValue == wishedDataRefValue) {
+				result = 1;
+			}
+		}
+		else
+		if (s.substr(0, 1) == ">") {
+			signal = ">";
+			wishedDataRefValue = convertToNumber(s.substr(1));
+			if (realDataRefValue > wishedDataRefValue) {
+				result = 1;
+			}
+		}
+		else
+		if (s.substr(0, 1) == "<") {
+			signal = "<";
+			wishedDataRefValue = convertToNumber(s.substr(1));
+			if (realDataRefValue < wishedDataRefValue) {
+				result = 1;
+			}
+		}
+		else
+		if (s.substr(0, 1) == ">=") {
+			signal = ">=";
+			wishedDataRefValue = convertToNumber(s.substr(2));
+			if (realDataRefValue >= wishedDataRefValue) {
+				result = 1;
+			}
+		}
+		else
+		if (s.substr(0, 1) == "<=") {
+			signal = "<=";
+			wishedDataRefValue = convertToNumber(s.substr(2));
+			if (realDataRefValue <= wishedDataRefValue) {
+				result = 1;
+			}
+		}
+		else
+		if (s.substr(0, 1) == "<>") {
+			signal = "<>";
+			wishedDataRefValue = convertToNumber(s.substr(2));
+			if (realDataRefValue != wishedDataRefValue) {
+				result = 1;
+			}
+		}
+		else {
+			signal = "=";
+			wishedDataRefValue = convertToNumber(s);
+			if (realDataRefValue == wishedDataRefValue) {
+				result = 1;
+			}
+		}
 
-		XPLMDebugString("---: realDataRefValue..: ");
-		XPLMDebugString(std::to_string(realDataRefValue).c_str());
-		XPLMDebugString("\n");
-
-		XPLMDebugString("---: wishedDataRefValue..: ");
-		XPLMDebugString(std::to_string(wishedDataRefValue).c_str());
-		XPLMDebugString("\n");
-		
-
-		if (realDataRefValue == wishedDataRefValue) {
-			result = 1;
+		if (result == 1) {
+			sprintf(msgPause, "DataRef %s (%s %s %s)", b1, convertToString(realDataRefValue).c_str(), signal.c_str(), convertToString(wishedDataRefValue).c_str());
 		}
 	}
 
