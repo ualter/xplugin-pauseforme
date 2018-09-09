@@ -39,8 +39,6 @@
 #define APL 0
 #define IBM 1
 
-//#define XPLM200 = 1;  // This example requires SDK2.0
-
 #pragma warning(disable: 4996)
 #pragma warning(disable: 4244)
 
@@ -78,7 +76,7 @@
     #include <GL/gl.h>
 #endif
 
-#ifndef XPLM300
+#ifndef XPLM301
     #error This is made to be compiled against the XPLM301 SDK
 #endif
 
@@ -143,8 +141,19 @@ static XPWidgetID wTextNavaidDMEID;
 static XPWidgetID wCaptionNavaidDMEDistance;
 static XPWidgetID wCaptionNavaidDMEDesc;
 static XPWidgetID wTextNavaidDMEDistanceMin;
+static XPWidgetID wDataRef1, wDataRef2, wDataRef3, wDataRefValue1, wDataRefValue2, wDataRefValue3;
+static XPWidgetID wChkDataRef1, wChkDataRef2, wChkDataRef3;
+
+int isDataRef1Selected, isDataRef2Selected, isDataRef3Selected;
 
 static XPWidgetID wChkToUnSelect;
+
+std::string dataRef1;
+std::string dataRefValue1;
+std::string dataRef2;
+std::string dataRefValue2;
+std::string dataRef3;
+std::string dataRefValue3;
 
 float userNavaidAirportDistance;
 std::string userNavaidAirportID;
@@ -295,6 +304,11 @@ std::string convertToString(long number)
 	return str;
 }
 
+std::string convertFloatWithDecimalsToString(long number)
+{
+	return std::to_string(number);
+}
+
 std::string formatLatLon(float number)
 {
 	std::ostringstream ostr;
@@ -334,8 +348,8 @@ void				dummy_key_handler(XPLMWindowID in_window_id, char key, XPLMKeyFlags flag
 void CreateWidgetWindow()
 {
 	int x = 150;
-	int y = 850;
-	int w = 820;
+	int y = 900;
+	int w = 840;
 	int h = 555;
 
 	int x2 = x + w;
@@ -654,10 +668,12 @@ void CreateWidgetWindow()
 
 	// Latitude e Longitude
 	leftX = x + leftMargin + 28;
+	int leftXLatLong = leftX;
 	rightX = leftX;
 	bottomY = topY - 10;
 	tmpY = topY;
 	tmpX = leftX;
+	int topYlatLong = topY;
 	XPCreateWidget(leftX + 20, topY, rightX + 100, bottomY, 1, "Latitude / Longitude (Decimal degrees)", 0, wMainWindow, xpWidgetClass_Caption);
 	leftX -= 30;
 	topY -= 20;
@@ -692,7 +708,7 @@ void CreateWidgetWindow()
 
 	// Navaids
 	int hTextField = 22;
-	leftX = x + leftMargin + 450;
+	leftX = x + leftMargin + 470;
 	rightX = leftX;
 	topY = tmpY - 10;
 	bottomY = topY - 10;
@@ -839,19 +855,6 @@ void CreateWidgetWindow()
 	XPSetWidgetProperty(wChkNavaidDME, xpProperty_ButtonBehavior, xpButtonBehaviorCheckBox);
 	XPSetWidgetProperty(wChkNavaidDME, xpProperty_ButtonState, isNavaidDMESelected);
 
-	//** Print Position Widget
-	//XPLMDebugString("--- aqui Position  wChkNavaidDME ---");
-	//XPLMDebugString(convertToString(leftX).c_str());
-	//XPLMDebugString(convertToString(topY).c_str());
-	//XPLMDebugString(convertToString(leftX + widthField).c_str());
-	//XPLMDebugString(convertToString(bottomY - 28).c_str());
-	//XPSetWidgetDescriptor(widgetDebug1, convertToString(bottomY - 28).c_str());
-	//XPLMDebugString("--- aqui ---");
-	////** End Print Position Widget
-
-	// Output Directory Backup value: .\Release\plugins\$(TargetName)\64\
-
-
 	leftX += 35;
 	topY -= 7;
 	bottomY = topY - 8;
@@ -879,6 +882,69 @@ void CreateWidgetWindow()
 	XPSetWidgetProperty(wCaptionNavaidDMEDesc, xpProperty_CaptionLit, 0);
 	topY += 3;
 
+	// Datarefs
+	int dataRefleftX   = leftXLatLong;
+	int dataReftopY    = topYlatLong - 60;
+	int dataRefRightX  = dataRefleftX;
+	int dataRefBottomY = topYlatLong - 80;
+	XPCreateWidget(dataRefleftX + 30, dataReftopY, dataRefRightX + 130, dataRefBottomY, 1, " ------ Pause with DataRefs ------", 0, wMainWindow, xpWidgetClass_Caption);
+	XPCreateWidget(dataRefleftX - 18, dataReftopY - 15, dataRefRightX + 50, dataRefBottomY - 25, 1, "DataRef...", 0, wMainWindow, xpWidgetClass_Caption);
+	XPCreateWidget(dataRefleftX + 193, dataReftopY - 15, dataRefRightX + 217, dataRefBottomY - 25, 1, "Pause when...", 0, wMainWindow, xpWidgetClass_Caption);
+
+	int sizeDataRefField     = 210;
+	int sizeDataRefValueField = 45;
+	int marginDataRefFields  = 30;
+	int gapBetweenFields     = 2;
+	int gapBetweenChks       = 5;
+
+	// Dataref 1
+	dataRefleftX += 5;
+	dataReftopY  -= 40;
+	dataRefBottomY = dataReftopY - heightFields;
+	wDataRef1 = XPCreateWidget(dataRefleftX - marginDataRefFields, dataReftopY, dataRefleftX + sizeDataRefField, dataRefBottomY, 1, dataRef1.c_str(), 0, wMainWindow, xpWidgetClass_TextField);
+	XPSetWidgetProperty(wDataRef1, xpProperty_TextFieldType, xpTextEntryField);
+	XPSetWidgetProperty(wDataRef1, xpProperty_MaxCharacters, 80);
+	int xDataRef = dataRefleftX + sizeDataRefField;
+	wDataRefValue1 = XPCreateWidget(xDataRef + gapBetweenFields, dataReftopY, xDataRef + gapBetweenFields + sizeDataRefValueField, dataRefBottomY, 1, dataRefValue1.c_str(), 0, wMainWindow, xpWidgetClass_TextField);
+	XPSetWidgetProperty(wDataRefValue1, xpProperty_TextFieldType, xpTextEntryField);
+	XPSetWidgetProperty(wDataRefValue1, xpProperty_MaxCharacters, 10);
+	xDataRef = dataRefleftX + sizeDataRefField + sizeDataRefValueField + gapBetweenChks;
+	wChkDataRef1 = XPCreateWidget(xDataRef + gapBetweenFields, dataReftopY - 1, xDataRef + gapBetweenChks + 5, dataRefBottomY - 1, 1, "", 0, wMainWindow, xpWidgetClass_Button);
+	XPSetWidgetProperty(wChkDataRef1, xpProperty_ButtonType, xpRadioButton);
+	XPSetWidgetProperty(wChkDataRef1, xpProperty_ButtonBehavior, xpButtonBehaviorCheckBox);
+	XPSetWidgetProperty(wChkDataRef1, xpProperty_ButtonState, isDataRef1Selected);
+
+	// Dataref 2
+	dataReftopY   -= 20;
+	dataRefBottomY = dataReftopY - heightFields;
+	wDataRef2 = XPCreateWidget(dataRefleftX - marginDataRefFields, dataReftopY, dataRefleftX + sizeDataRefField, dataRefBottomY, 1, dataRef2.c_str(), 0, wMainWindow, xpWidgetClass_TextField);
+	XPSetWidgetProperty(wDataRef2, xpProperty_TextFieldType, xpTextEntryField);
+	XPSetWidgetProperty(wDataRef2, xpProperty_MaxCharacters, 80);
+	xDataRef = dataRefleftX + sizeDataRefField;
+	wDataRefValue2 = XPCreateWidget(xDataRef + gapBetweenFields, dataReftopY, xDataRef + gapBetweenFields + sizeDataRefValueField, dataRefBottomY, 1, dataRefValue2.c_str(), 0, wMainWindow, xpWidgetClass_TextField);
+	XPSetWidgetProperty(wDataRefValue2, xpProperty_TextFieldType, xpTextEntryField);
+	XPSetWidgetProperty(wDataRefValue2, xpProperty_MaxCharacters, 10);
+	xDataRef = dataRefleftX + sizeDataRefField + sizeDataRefValueField + gapBetweenChks;
+	wChkDataRef2 = XPCreateWidget(xDataRef + gapBetweenFields, dataReftopY - 1, xDataRef + gapBetweenChks + 5, dataRefBottomY - 1, 1, "", 0, wMainWindow, xpWidgetClass_Button);
+	XPSetWidgetProperty(wChkDataRef2, xpProperty_ButtonType, xpRadioButton);
+	XPSetWidgetProperty(wChkDataRef2, xpProperty_ButtonBehavior, xpButtonBehaviorCheckBox);
+	XPSetWidgetProperty(wChkDataRef2, xpProperty_ButtonState, isDataRef2Selected);
+
+	// Dataref 3
+	dataReftopY -= 20;
+	dataRefBottomY = dataReftopY - heightFields;
+	wDataRef3 = XPCreateWidget(dataRefleftX - marginDataRefFields, dataReftopY, dataRefleftX + sizeDataRefField, dataRefBottomY, 1, dataRef3.c_str(), 0, wMainWindow, xpWidgetClass_TextField);
+	XPSetWidgetProperty(wDataRef3, xpProperty_TextFieldType, xpTextEntryField);
+	XPSetWidgetProperty(wDataRef3, xpProperty_MaxCharacters, 80);
+	xDataRef = dataRefleftX + sizeDataRefField;
+	wDataRefValue3 = XPCreateWidget(xDataRef + gapBetweenFields, dataReftopY, xDataRef + gapBetweenFields + sizeDataRefValueField, dataRefBottomY, 1, dataRefValue3.c_str(), 0, wMainWindow, xpWidgetClass_TextField);
+	XPSetWidgetProperty(wDataRefValue3, xpProperty_TextFieldType, xpTextEntryField);
+	XPSetWidgetProperty(wDataRefValue3, xpProperty_MaxCharacters, 10);
+	xDataRef = dataRefleftX + sizeDataRefField + sizeDataRefValueField + gapBetweenChks;
+	wChkDataRef3 = XPCreateWidget(xDataRef + gapBetweenFields, dataReftopY - 1, xDataRef + gapBetweenChks + 5, dataRefBottomY - 1, 1, "", 0, wMainWindow, xpWidgetClass_Button);
+	XPSetWidgetProperty(wChkDataRef3, xpProperty_ButtonType, xpRadioButton);
+	XPSetWidgetProperty(wChkDataRef3, xpProperty_ButtonBehavior, xpButtonBehaviorCheckBox);
+	XPSetWidgetProperty(wChkDataRef3, xpProperty_ButtonState, isDataRef3Selected);
 
 
 	//*********************************************************************************************************************************
@@ -923,23 +989,41 @@ void CreateWidgetWindow()
 	leftX += 160;
 	widgetDebug3 = XPCreateWidget(leftX, topY, leftX+80, bottomY,1,"Debug3!",0,wMainWindow,xpWidgetClass_Caption);
 
+	XPSetWidgetDescriptor(widgetDebug1, dataRef1.c_str());
 
-	XPLMCreateWindow_t params;
-	params.structSize = sizeof(params);
-	params.visible = 1;
-	params.drawWindowFunc = draw_hello_world;
-	// Note on "dummy" handlers:
-	// Even if we don't want to handle these events, we have to register a "do-nothing" callback for them
-	params.handleMouseClickFunc = dummy_mouse_handler;
-	params.handleRightClickFunc = dummy_mouse_handler;
-	params.handleMouseWheelFunc = dummy_wheel_handler;
-	params.handleKeyFunc = dummy_key_handler;
-	params.handleCursorFunc = dummy_cursor_status_handler;
-	params.refcon = NULL;
-	params.layer = xplm_WindowLayerFloatingWindows;
-	// Opt-in to styling our window like an X-Plane 11 native window
-	// If you're on XPLM300, not XPLM301, swap this enum for the literal value 1.
-	params.decorateAsFloatingWindow = xplm_WindowDecorationRoundRectangle;
+	// AQUI
+	//XPLMCreateWindow_t params;
+	//params.structSize = sizeof(params);
+	//params.visible = 1;
+	//params.drawWindowFunc = draw_hello_world;
+	//// Note on "dummy" handlers:
+	//// Even if we don't want to handle these events, we have to register a "do-nothing" callback for them
+	//params.handleMouseClickFunc = dummy_mouse_handler;
+	//params.handleRightClickFunc = dummy_mouse_handler;
+	//params.handleMouseWheelFunc = dummy_wheel_handler;
+	//params.handleKeyFunc = dummy_key_handler;
+	//params.handleCursorFunc = dummy_cursor_status_handler;
+	//params.refcon = NULL;
+	//params.layer = xplm_WindowLayerFloatingWindows;
+	//// Opt-in to styling our window like an X-Plane 11 native window
+	//// If you're on XPLM300, not XPLM301, swap this enum for the literal value 1.
+	//params.decorateAsFloatingWindow = xplm_WindowDecorationRoundRectangle;
+	//// Set the window's initial bounds
+	//// Note that we're not guaranteed that the main monitor's lower left is at (0, 0)...
+	//// We'll need to query for the global desktop bounds!
+	//int left, bottom, right, top;
+	//XPLMGetScreenBoundsGlobal(&left, &top, &right, &bottom);
+	//params.left = left + 50;
+	//params.bottom = bottom + 150;
+	//params.right = params.left + 200;
+	//params.top = params.bottom + 200;
+	//g_window = XPLMCreateWindowEx(&params);
+	//// Position the window as a "free" floating window, which the user can drag around
+	//XPLMSetWindowPositioningMode(g_window, xplm_WindowPositionFree, -1);
+	//// Limit resizing our window: maintain a minimum width/height of 100 boxels and a max width/height of 300 boxels
+	//XPLMSetWindowResizingLimits(g_window, 200, 200, 300, 300);
+	//XPLMSetWindowTitle(g_window, "Pause for Me");
+
 
 	XPAddWidgetCallback(wMainWindow, widgetWidgetHandler);
 }
@@ -1002,6 +1086,13 @@ void saveFileValues()
 	fileIniWriter << "navaidFixDistance=" + convertToString(userNavaidFixDistance) + "\n";
 	fileIniWriter << "navaidDMEId=" + userNavaidDMEID + "\n";
 	fileIniWriter << "navaidDMEDistance=" + convertToString(userNavaidDMEDistance) + "\n";
+
+	fileIniWriter << "dataRef1=" + dataRef1 + "\n";
+	fileIniWriter << "dataRefValue1=" + dataRefValue1 + "\n";
+	fileIniWriter << "dataRef2=" + dataRef2 + "\n";
+	fileIniWriter << "dataRefValue2=" + dataRefValue2 + "\n";
+	fileIniWriter << "dataRef3=" + dataRef3 + "\n";
+	fileIniWriter << "dataRefValue3=" + dataRefValue3 + "\n";
 
 	fileIniWriter.close();
 }
@@ -1100,6 +1191,22 @@ int widgetWidgetHandler(XPWidgetMessage			inMessage,
 			userNavaidFixDistance = convertToNumber(buffer);
 			XPGetWidgetDescriptor(wTextNavaidDMEDistanceMin, buffer, sizeof(buffer));
 			userNavaidDMEDistance = convertToNumber(buffer);
+
+			// DataRefs
+			XPGetWidgetDescriptor(wDataRef1, buffer, sizeof(buffer));
+			dataRef1 = buffer;
+			XPGetWidgetDescriptor(wDataRefValue1, buffer, sizeof(buffer));
+			dataRefValue1 = buffer;
+
+			XPGetWidgetDescriptor(wDataRef2, buffer, sizeof(buffer));
+			dataRef2 = buffer;
+			XPGetWidgetDescriptor(wDataRefValue2, buffer, sizeof(buffer));
+			dataRefValue2 = buffer;
+
+			XPGetWidgetDescriptor(wDataRef3, buffer, sizeof(buffer));
+			dataRef3 = buffer;
+			XPGetWidgetDescriptor(wDataRefValue3, buffer, sizeof(buffer));
+			dataRefValue3 = buffer;
 
 			saveFileValues();
 			return 1;
@@ -1201,6 +1308,24 @@ int widgetWidgetHandler(XPWidgetMessage			inMessage,
 		{
 			long isStateTrue = XPGetWidgetProperty(wChkNavaidDME, xpProperty_ButtonState, 0);
 			isStateTrue ? isNavaidDMESelected = 1 : isNavaidDMESelected = 0;
+			return 1;
+		}
+		if (inParam1 == (intptr_t)wChkDataRef1)
+		{
+			long isStateTrue = XPGetWidgetProperty(wChkDataRef1, xpProperty_ButtonState, 0);
+			isStateTrue ? isDataRef1Selected = 1 : isDataRef1Selected = 0;
+			return 1;
+		}
+		if (inParam1 == (intptr_t)wChkDataRef2)
+		{
+			long isStateTrue = XPGetWidgetProperty(wChkDataRef2, xpProperty_ButtonState, 0);
+			isStateTrue ? isDataRef2Selected = 1 : isDataRef2Selected = 0;
+			return 1;
+		}
+		if (inParam1 == (intptr_t)wChkDataRef3)
+		{
+			long isStateTrue = XPGetWidgetProperty(wChkDataRef3, xpProperty_ButtonState, 0);
+			isStateTrue ? isDataRef3Selected = 1 : isDataRef3Selected = 0;
 			return 1;
 		}
 	}
@@ -1407,6 +1532,7 @@ void getXPlaneDataInfos()
 		currentLatitude, currentLongitude, xplm_Nav_Fix);
 	navaidDME = setInfoNavaid(2, wTextNavaidDMEID, wCaptionNavaidDMEDistance, wCaptionNavaidDMEDesc,
 		currentLatitude, currentLongitude, xplm_Nav_DME);
+
 }
 
 std::string checkSignal(int vlrDir, int vlrEsq) {
@@ -1420,6 +1546,7 @@ std::string checkSignal(int vlrDir, int vlrEsq) {
 	return "=";
 }
 
+int checkDataRefs(int number);
 /*
 * Check if something hit the state necessary to pause the x-plane and...  pause!
 */
@@ -1620,6 +1747,119 @@ float pauseXPlane() {
 		}
 	}
 
+	if (isDataRef1Selected) {
+		result = checkDataRefs(1);
+		if (result == 1) {
+			sprintf(msgPause, "DataRef %s", dataRef1.c_str());
+				// convertToString(navaidDME.distance).c_str(), convertToString(userNavaidDMEDistance).c_str());
+			wChkToUnSelect     = wChkDataRef1;
+			isDataRef1Selected = 0;
+		}
+	}
+
+	if (isDataRef2Selected) {
+		result = checkDataRefs(2);
+		if (result == 1) {
+			sprintf(msgPause, "DataRef %s", dataRef2.c_str());
+			// convertToString(navaidDME.distance).c_str(), convertToString(userNavaidDMEDistance).c_str());
+			wChkToUnSelect = wChkDataRef2;
+			isDataRef2Selected = 0;
+		}
+	}
+
+	if (isDataRef3Selected) {
+		result = checkDataRefs(3);
+		if (result == 1) {
+			sprintf(msgPause, "DataRef %s", dataRef3.c_str());
+			// convertToString(navaidDME.distance).c_str(), convertToString(userNavaidDMEDistance).c_str());
+			wChkToUnSelect = wChkDataRef3;
+			isDataRef3Selected = 0;
+		}
+	}
+
+	return result;
+}
+
+int checkDataRefs(int number) {
+	XPWidgetID wDataRef;
+	XPWidgetID wDataRefValue;
+	XPWidgetID debugId;
+	XPWidgetID wCheckbox;
+	int        result = 0;
+
+	if (number == 1) {
+		wDataRef      = wDataRef1;
+		wDataRefValue = wDataRefValue1;
+		debugId       = widgetDebug1;
+		wCheckbox     = wChkDataRef1;
+	} else
+	if (number == 2) {
+		wDataRef      = wDataRef2;
+		wDataRefValue = wDataRefValue2;
+		debugId       = widgetDebug2;
+		wCheckbox     = wChkDataRef2;
+	} else
+	if (number == 3) {
+		wDataRef      = wDataRef3;
+		wDataRefValue = wDataRefValue3;
+		debugId       = widgetDebug3;
+		wCheckbox     = wChkDataRef3;
+	}
+
+	char b1[256], b2[256];
+	XPGetWidgetDescriptor(wDataRef, b1, sizeof(b1));
+	XPGetWidgetDescriptor(wDataRefValue, b2, sizeof(b2));
+	
+	std::string s = b2;
+	// Float or Int (if there's a point, so...  it is a Float value, otherwise it will be treated as a Integer)
+	if (s.find('.') != std::string::npos) {
+		float realDataRefValue   = XPLMGetDataf(XPLMFindDataRef(b1));
+		float wishedDataRefValue = convertToNumber(b2);
+		XPSetWidgetDescriptor(debugId, std::to_string(realDataRefValue).c_str());
+
+		XPLMDebugString("---: number..: ");
+		XPLMDebugString(std::to_string(number).c_str());
+		XPLMDebugString("\n");
+
+		XPLMDebugString("---: realDataRefValue..: ");
+		XPLMDebugString(std::to_string(realDataRefValue).c_str());
+		XPLMDebugString("\n");
+
+		XPLMDebugString("---: wishedDataRefValue..: ");
+		XPLMDebugString(std::to_string(wishedDataRefValue).c_str());
+		XPLMDebugString("\n");
+
+		if (realDataRefValue == wishedDataRefValue) {
+			result = 1;
+		}
+	} else {
+		int   realDataRefValue = (int)XPLMGetDataf(XPLMFindDataRef(b1));
+		int   wishedDataRefValue = convertToNumber(b2);
+		XPSetWidgetDescriptor(debugId, convertToString(realDataRefValue).c_str());
+
+		XPLMDebugString("---: number..: ");
+		XPLMDebugString(std::to_string(number).c_str());
+		XPLMDebugString("\n");
+
+		XPLMDebugString("---: realDataRefValue..: ");
+		XPLMDebugString(std::to_string(realDataRefValue).c_str());
+		XPLMDebugString("\n");
+
+		XPLMDebugString("---: wishedDataRefValue..: ");
+		XPLMDebugString(std::to_string(wishedDataRefValue).c_str());
+		XPLMDebugString("\n");
+		
+
+		if (realDataRefValue == wishedDataRefValue) {
+			result = 1;
+		}
+	}
+
+	XPLMDebugString(" RESULT..: ");
+	XPLMDebugString(std::to_string(result).c_str());
+	XPLMDebugString("\n");
+	XPLMDebugString("\n");
+
 	return result;
 }
 
@@ -1815,6 +2055,28 @@ void checkPreferenceFile() {
 			if (strcmp(param.c_str(), "navaidDMEDistance") == 0)  {
 				userNavaidDMEDistance = atoi(value.c_str());
 			}
+			else
+			if (strcmp(param.c_str(), "dataRef1") == 0) {
+				dataRef1 = value.c_str();
+			}
+			else
+			if (strcmp(param.c_str(), "dataRefValue1") == 0) {
+				dataRefValue1 = value.c_str();
+			}
+			if (strcmp(param.c_str(), "dataRef2") == 0) {
+				dataRef2 = value.c_str();
+			}
+			else
+			if (strcmp(param.c_str(), "dataRefValue2") == 0) {
+				dataRefValue2 = value.c_str();
+			}
+			if (strcmp(param.c_str(), "dataRef3") == 0) {
+				dataRef3 = value.c_str();
+			}
+			else
+			if (strcmp(param.c_str(), "dataRefValue3") == 0) {
+				dataRefValue3 = value.c_str();
+			}
 		}
 		fileIniReader.close();
 	} else {
@@ -1856,6 +2118,9 @@ void checkPreferenceFile() {
 		fileIniWriter << "navaidFixDistance=0\n";
 		fileIniWriter << "navaidDMEId=\n";
 		fileIniWriter << "navaidDMEDistance=0\n";
+
+		fileIniWriter << "dataRef1=sim/cockpit/electrical/battery_on\n";
+		fileIniWriter << "dataRefValue1=0\n";
 
 		fileIniWriter.close();
 	}
