@@ -143,6 +143,7 @@ static XPWidgetID wCaptionNavaidDMEDesc;
 static XPWidgetID wTextNavaidDMEDistanceMin;
 static XPWidgetID wDataRef1, wDataRef2, wDataRef3, wDataRefValue1, wDataRefValue2, wDataRefValue3;
 static XPWidgetID wChkDataRef1, wChkDataRef2, wChkDataRef3;
+static XPWidgetID wCaptionDataRef1, wCaptionDataRef2, wCaptionDataRef3;
 
 int isDataRef1Selected, isDataRef2Selected, isDataRef3Selected;
 
@@ -236,6 +237,10 @@ float CallBackXPlane(float  inElapsedSinceLastCall,
 static void PauseForMeMenuHandler(void *, void *);
 
 void checkPreferenceFile();
+
+void log(std::string s);
+
+void resetDataRefsValues();
 
 XPLMCommandRef SetupOnCommand = NULL;
 XPLMCommandRef SetupOffCommand = NULL;
@@ -349,8 +354,8 @@ void CreateWidgetWindow()
 {
 	int x = 150;
 	int y = 900;
-	int w = 840;
-	int h = 555;
+	int w = 940;
+	int h = 490;
 
 	int x2 = x + w;
 	int y2 = y - h;
@@ -608,7 +613,7 @@ void CreateWidgetWindow()
 
 	// GPS
 	topY = tmpY + 18;
-	tmpX = 480;
+	tmpX = 600;
 	leftX = x + leftMargin + tmpX + padX + padX;
 	rightX = leftX + widthCaption;
 	bottomY = topY - heightFields;
@@ -708,7 +713,7 @@ void CreateWidgetWindow()
 
 	// Navaids
 	int hTextField = 22;
-	leftX = x + leftMargin + 470;
+	leftX = x + leftMargin + 570;
 	rightX = leftX;
 	topY = tmpY - 10;
 	bottomY = topY - 10;
@@ -887,15 +892,15 @@ void CreateWidgetWindow()
 	int dataReftopY    = topYlatLong - 60;
 	int dataRefRightX  = dataRefleftX;
 	int dataRefBottomY = topYlatLong - 80;
-	XPCreateWidget(dataRefleftX + 30, dataReftopY, dataRefRightX + 130, dataRefBottomY, 1, " ------ Pause with DataRefs ------", 0, wMainWindow, xpWidgetClass_Caption);
+	XPCreateWidget(dataRefleftX + 30, dataReftopY - 5, dataRefRightX + 130, dataRefBottomY - 5, 1, " ------ Pause with DataRefs ------", 0, wMainWindow, xpWidgetClass_Caption);
 	XPCreateWidget(dataRefleftX - 18, dataReftopY - 15, dataRefRightX + 50, dataRefBottomY - 25, 1, "DataRef...", 0, wMainWindow, xpWidgetClass_Caption);
-	XPCreateWidget(dataRefleftX + 193, dataReftopY - 15, dataRefRightX + 217, dataRefBottomY - 25, 1, "Pause when...", 0, wMainWindow, xpWidgetClass_Caption);
+	XPCreateWidget(dataRefleftX + 255, dataReftopY - 15, dataRefRightX + 265, dataRefBottomY - 25, 1, "Pause when...", 0, wMainWindow, xpWidgetClass_Caption);
 
-	int sizeDataRefField     = 210;
-	int sizeDataRefValueField = 45;
-	int marginDataRefFields  = 30;
-	int gapBetweenFields     = 2;
-	int gapBetweenChks       = 5;
+	int sizeDataRefField      = 260;
+	int sizeDataRefValueField = 60;
+	int marginDataRefFields   = 30;
+	int gapBetweenFields      = 2;
+	int gapBetweenChks        = 5;
 
 	// Dataref 1
 	dataRefleftX += 5;
@@ -913,6 +918,9 @@ void CreateWidgetWindow()
 	XPSetWidgetProperty(wChkDataRef1, xpProperty_ButtonType, xpRadioButton);
 	XPSetWidgetProperty(wChkDataRef1, xpProperty_ButtonBehavior, xpButtonBehaviorCheckBox);
 	XPSetWidgetProperty(wChkDataRef1, xpProperty_ButtonState, isDataRef1Selected);
+	xDataRef = dataRefleftX + sizeDataRefField + sizeDataRefValueField + gapBetweenChks + 13;
+	wCaptionDataRef1 = XPCreateWidget(xDataRef, dataReftopY + 1, xDataRef + 10, dataRefBottomY + 1, 1, "-----", 0, wMainWindow, xpWidgetClass_Caption);
+	XPSetWidgetProperty(wCaptionDataRef1, xpProperty_CaptionLit, 0);
 
 	// Dataref 2
 	dataReftopY   -= 20;
@@ -929,6 +937,9 @@ void CreateWidgetWindow()
 	XPSetWidgetProperty(wChkDataRef2, xpProperty_ButtonType, xpRadioButton);
 	XPSetWidgetProperty(wChkDataRef2, xpProperty_ButtonBehavior, xpButtonBehaviorCheckBox);
 	XPSetWidgetProperty(wChkDataRef2, xpProperty_ButtonState, isDataRef2Selected);
+	xDataRef = dataRefleftX + sizeDataRefField + sizeDataRefValueField + gapBetweenChks + 13;
+	wCaptionDataRef2 = XPCreateWidget(xDataRef, dataReftopY + 1, xDataRef + 10, dataRefBottomY + 1, 1, "-----", 0, wMainWindow, xpWidgetClass_Caption);
+	XPSetWidgetProperty(wCaptionDataRef2, xpProperty_CaptionLit, 0);
 
 	// Dataref 3
 	dataReftopY -= 20;
@@ -945,14 +956,17 @@ void CreateWidgetWindow()
 	XPSetWidgetProperty(wChkDataRef3, xpProperty_ButtonType, xpRadioButton);
 	XPSetWidgetProperty(wChkDataRef3, xpProperty_ButtonBehavior, xpButtonBehaviorCheckBox);
 	XPSetWidgetProperty(wChkDataRef3, xpProperty_ButtonState, isDataRef3Selected);
+	xDataRef = dataRefleftX + sizeDataRefField + sizeDataRefValueField + gapBetweenChks + 13;
+	wCaptionDataRef3 = XPCreateWidget(xDataRef, dataReftopY + 1, xDataRef + 10, dataRefBottomY + 1, 1, "-----", 0, wMainWindow, xpWidgetClass_Caption);
+	XPSetWidgetProperty(wCaptionDataRef3, xpProperty_CaptionLit, 0);
 
 
 	//*********************************************************************************************************************************
 
-	topY -= 50;
+	topY -= 45;
 
 	// Button Save
-	tmpX = 320;
+	tmpX = 390;
 	leftX = x + tmpX;
 	bottomY = topY - heightFields - 5;
 	wBtnSave = XPCreateWidget(leftX, topY, leftX + 60, bottomY, 1, "Save", 0, wMainWindow, xpWidgetClass_Button);
@@ -963,8 +977,8 @@ void CreateWidgetWindow()
 	wBtnCancel = XPCreateWidget(leftX, topY, leftX + 60, bottomY, 1, "Exit", 0, wMainWindow, xpWidgetClass_Button);
 	XPSetWidgetProperty(wBtnCancel, xpProperty_ButtonType, xpPushButton);
 
-	topY -= 25;
-	XPWidgetID email = XPCreateWidget(leftX + 210, topY, leftX + 310, bottomY, 1, "ualter.junior@gmail.com", 0, wMainWindow, xpWidgetClass_Caption);
+	topY -= 30;
+	XPWidgetID email = XPCreateWidget(leftX + 273, topY, leftX + 283, topY - 5, 1, "ualter.junior@gmail.com", 0, wMainWindow, xpWidgetClass_Caption);
 	XPSetWidgetProperty(email, xpProperty_CaptionLit, 1);
 
 	
@@ -976,7 +990,7 @@ void CreateWidgetWindow()
 	// Button Reload
 	leftX += 100;
 	bottomY = topY-heightFields;
-	wBtnReload = XPCreateWidget(leftX, topY-5, leftX+40, bottomY,1,"Reload",0,wMainWindow,xpWidgetClass_Button);
+	wBtnReload = XPCreateWidget(leftX, topY-5, leftX+80, bottomY,1,"Reload",0,wMainWindow,xpWidgetClass_Button);
 	XPSetWidgetProperty(wBtnReload,xpProperty_ButtonType,xpPushButton);
 
 	// Just For Debug Purposes
@@ -988,8 +1002,6 @@ void CreateWidgetWindow()
 	widgetDebug2 = XPCreateWidget(leftX, topY, leftX+80, bottomY,1,"Debug2!",0,wMainWindow,xpWidgetClass_Caption);
 	leftX += 160;
 	widgetDebug3 = XPCreateWidget(leftX, topY, leftX+80, bottomY,1,"Debug3!",0,wMainWindow,xpWidgetClass_Caption);
-
-	XPSetWidgetDescriptor(widgetDebug1, dataRef1.c_str());
 
 	// AQUI
 	//XPLMCreateWindow_t params;
@@ -1216,6 +1228,7 @@ int widgetWidgetHandler(XPWidgetMessage			inMessage,
 			XPHideWidget(wAlertWindow);
 			AlertWindowShown = 0;
 			XPLMCommandKeyStroke(xplm_key_pause);
+			resetDataRefsValues();
 		}
 		if (inParam1 == (intptr_t)wBtnCancel)
 		{
@@ -1314,18 +1327,21 @@ int widgetWidgetHandler(XPWidgetMessage			inMessage,
 		{
 			long isStateTrue = XPGetWidgetProperty(wChkDataRef1, xpProperty_ButtonState, 0);
 			isStateTrue ? isDataRef1Selected = 1 : isDataRef1Selected = 0;
+			resetDataRefsValues();
 			return 1;
 		}
 		if (inParam1 == (intptr_t)wChkDataRef2)
 		{
 			long isStateTrue = XPGetWidgetProperty(wChkDataRef2, xpProperty_ButtonState, 0);
 			isStateTrue ? isDataRef2Selected = 1 : isDataRef2Selected = 0;
+			resetDataRefsValues();
 			return 1;
 		}
 		if (inParam1 == (intptr_t)wChkDataRef3)
 		{
 			long isStateTrue = XPGetWidgetProperty(wChkDataRef3, xpProperty_ButtonState, 0);
 			isStateTrue ? isDataRef3Selected = 1 : isDataRef3Selected = 0;
+			resetDataRefsValues();
 			return 1;
 		}
 	}
@@ -1753,20 +1769,18 @@ float pauseXPlane() {
 			wChkToUnSelect     = wChkDataRef1;
 			isDataRef1Selected = 0;
 		}
-	}
-
+	} else
 	if (isDataRef2Selected) {
 		result = checkDataRefs(2);
 		if (result == 1) {
-			wChkToUnSelect = wChkDataRef2;
+			wChkToUnSelect     = wChkDataRef2;
 			isDataRef2Selected = 0;
 		}
-	}
-
+	} else
 	if (isDataRef3Selected) {
 		result = checkDataRefs(3);
 		if (result == 1) {
-			wChkToUnSelect = wChkDataRef3;
+			wChkToUnSelect     = wChkDataRef3;
 			isDataRef3Selected = 0;
 		}
 	}
@@ -1779,6 +1793,7 @@ int checkDataRefs(int number) {
 	XPWidgetID wDataRefValue;
 	XPWidgetID debugId;
 	XPWidgetID wCheckbox;
+	XPWidgetID wCaption;
 	int        result = 0;
 
 	if (number == 1) {
@@ -1786,33 +1801,68 @@ int checkDataRefs(int number) {
 		wDataRefValue = wDataRefValue1;
 		debugId       = widgetDebug1;
 		wCheckbox     = wChkDataRef1;
+		wCaption = wCaptionDataRef1;
 	} else
 	if (number == 2) {
 		wDataRef      = wDataRef2;
 		wDataRefValue = wDataRefValue2;
 		debugId       = widgetDebug2;
 		wCheckbox     = wChkDataRef2;
+		wCaption      = wCaptionDataRef2;
 	} else
 	if (number == 3) {
 		wDataRef      = wDataRef3;
 		wDataRefValue = wDataRefValue3;
 		debugId       = widgetDebug3;
 		wCheckbox     = wChkDataRef3;
+		wCaption      = wCaptionDataRef3;
 	}
 
 	char b1[256], b2[256];
 	XPGetWidgetDescriptor(wDataRef, b1, sizeof(b1));
 	XPGetWidgetDescriptor(wDataRefValue, b2, sizeof(b2));
 	
-	std::string s      = b2;
-	std::string signal = "";
+	std::string s                      = b2;
+	std::string signal                 = "";
+	std::string realDataRefValueStr    = "";
+	std::string wishedDataRefValueStr  = "";
 	// Float or Int (if there's a point, so...  it is a Float value, otherwise it will be treated as a Integer)
 	if (s.find('.') != std::string::npos) {
 		float realDataRefValue   = XPLMGetDataf(XPLMFindDataRef(b1));
 		float wishedDataRefValue = 0;
 
-		XPSetWidgetDescriptor(debugId, std::to_string(realDataRefValue).c_str());
+		XPSetWidgetDescriptor(wCaption, std::to_string(realDataRefValue).c_str());
+		XPSetWidgetProperty(wCaption, xpProperty_CaptionLit, 1);
 
+		if (s.substr(0, 2) == ">=") {
+			log("aqui");
+
+			signal = ">=";
+			wishedDataRefValue = convertToNumber(s.substr(2));
+
+			log(s.substr(2));
+			log(std::to_string(wishedDataRefValue));
+
+			if (realDataRefValue >= wishedDataRefValue) {
+				result = 1;
+			}
+		}
+		else
+		if (s.substr(0, 2) == "<=") {
+			signal = "<=";
+			wishedDataRefValue = convertToNumber(s.substr(2));
+			if (realDataRefValue <= wishedDataRefValue) {
+				result = 1;
+			}
+		}
+		else
+		if (s.substr(0, 2) == "<>") {
+			signal = "<>";
+			wishedDataRefValue = convertToNumber(s.substr(2));
+			if (realDataRefValue != wishedDataRefValue) {
+				result = 1;
+			}
+		} else
 		if (s.substr(0, 1) == "=") {
 			signal = "=";
 			wishedDataRefValue = convertToNumber(s.substr(1));
@@ -1834,27 +1884,64 @@ int checkDataRefs(int number) {
 			if (realDataRefValue < wishedDataRefValue) {
 				result = 1;
 			}
+		} else {
+			signal = "=";
+			wishedDataRefValue = convertToNumber(s);
+			if (realDataRefValue == wishedDataRefValue) {
+				result = 1;
+			}
 		}
-		else
-		if (s.substr(0, 1) == ">=") {
+
+		if (result == 1) {
+			realDataRefValueStr   = convertToString(realDataRefValue).c_str();
+			wishedDataRefValueStr = convertToString(wishedDataRefValue).c_str();
+		}
+	} else {
+		int   realDataRefValue   = (int)XPLMGetDataf(XPLMFindDataRef(b1));
+		int   wishedDataRefValue = 0;
+
+		XPSetWidgetDescriptor(wCaption, std::to_string(realDataRefValue).c_str());
+		XPSetWidgetProperty(wCaption, xpProperty_CaptionLit, 1);
+
+		if (s.substr(0, 2) == ">=") {
 			signal = ">=";
 			wishedDataRefValue = convertToNumber(s.substr(2));
 			if (realDataRefValue >= wishedDataRefValue) {
 				result = 1;
 			}
-		} 
-		else
-		if (s.substr(0, 1) == "<=") {
+		} else
+		if (s.substr(0, 2) == "<=") {
 			signal = "<=";
 			wishedDataRefValue = convertToNumber(s.substr(2));
 			if (realDataRefValue <= wishedDataRefValue) {
 				result = 1;
 			}
 		} else
-		if (s.substr(0, 1) == "<>") {
+		if (s.substr(0, 2) == "<>") {
 			signal = "<>";
 			wishedDataRefValue = convertToNumber(s.substr(2));
 			if (realDataRefValue != wishedDataRefValue) {
+				result = 1;
+			}
+		} else
+		if (s.substr(0, 1) == "=") {
+			signal = "=";
+			wishedDataRefValue = convertToNumber(s.substr(1));
+			if (realDataRefValue == wishedDataRefValue) {
+				result = 1;
+			}
+		} else
+		if (s.substr(0, 1) == ">") {
+			signal = ">";
+			wishedDataRefValue = convertToNumber(s.substr(1));
+			if (realDataRefValue > wishedDataRefValue) {
+				result = 1;
+			}
+		} else
+		if (s.substr(0, 1) == "<") {
+			signal = "<";
+			wishedDataRefValue = convertToNumber(s.substr(1));
+			if (realDataRefValue < wishedDataRefValue) {
 				result = 1;
 			}
 		} else {
@@ -1866,79 +1953,12 @@ int checkDataRefs(int number) {
 		}
 
 		if (result == 1) {
-			sprintf(msgPause, "DataRef %s (%s %s %s)", b1, convertToString(realDataRefValue).c_str(), signal.c_str(), convertToString(wishedDataRefValue).c_str());
-		}
-	} else {
-		int   realDataRefValue   = (int)XPLMGetDataf(XPLMFindDataRef(b1));
-		int   wishedDataRefValue = 0;
-
-		XPSetWidgetDescriptor(debugId, convertToString(realDataRefValue).c_str());
-
-		if (s.substr(0, 1) == "=") {
-			signal = "=";
-			wishedDataRefValue = convertToNumber(s.substr(1));
-			if (realDataRefValue == wishedDataRefValue) {
-				result = 1;
-			}
-		}
-		else
-		if (s.substr(0, 1) == ">") {
-			signal = ">";
-			wishedDataRefValue = convertToNumber(s.substr(1));
-			if (realDataRefValue > wishedDataRefValue) {
-				result = 1;
-			}
-		}
-		else
-		if (s.substr(0, 1) == "<") {
-			signal = "<";
-			wishedDataRefValue = convertToNumber(s.substr(1));
-			if (realDataRefValue < wishedDataRefValue) {
-				result = 1;
-			}
-		}
-		else
-		if (s.substr(0, 1) == ">=") {
-			signal = ">=";
-			wishedDataRefValue = convertToNumber(s.substr(2));
-			if (realDataRefValue >= wishedDataRefValue) {
-				result = 1;
-			}
-		}
-		else
-		if (s.substr(0, 1) == "<=") {
-			signal = "<=";
-			wishedDataRefValue = convertToNumber(s.substr(2));
-			if (realDataRefValue <= wishedDataRefValue) {
-				result = 1;
-			}
-		}
-		else
-		if (s.substr(0, 1) == "<>") {
-			signal = "<>";
-			wishedDataRefValue = convertToNumber(s.substr(2));
-			if (realDataRefValue != wishedDataRefValue) {
-				result = 1;
-			}
-		}
-		else {
-			signal = "=";
-			wishedDataRefValue = convertToNumber(s);
-			if (realDataRefValue == wishedDataRefValue) {
-				result = 1;
-			}
-		}
-
-		if (result == 1) {
-			sprintf(msgPause, "DataRef %s (%s %s %s)", b1, convertToString(realDataRefValue).c_str(), signal.c_str(), convertToString(wishedDataRefValue).c_str());
+			realDataRefValueStr = convertToString(realDataRefValue).c_str();
+			wishedDataRefValueStr = convertToString(wishedDataRefValue).c_str();
 		}
 	}
 
-	XPLMDebugString(" RESULT..: ");
-	XPLMDebugString(std::to_string(result).c_str());
-	XPLMDebugString("\n");
-	XPLMDebugString("\n");
-
+	sprintf(msgPause, "DataRef %s (%s %s %s)", b1, realDataRefValueStr.c_str(), signal.c_str(), wishedDataRefValueStr.c_str());
 	return result;
 }
 
@@ -1955,7 +1975,7 @@ float CallBackXPlane(float  inElapsedSinceLastCall,
 		{
 			if (!AlertWindowShown) {
 				int aX = 730, aY = 780;
-				int aW = 320, aH = 150;
+				int aW = 420, aH = 150;
 				wAlertWindow = XPCreateWidget(aX, aY, aX + aW, aY - aH, 1, "Pause For Me!!!", 1, NULL, xpWidgetClass_SubWindow);
 				//XPSetWidgetProperty(wAlertWindow, xpProperty_MainWindowHasCloseBoxes, 1) (Erro quando ligado!!!);
 				XPWidgetID c0 = XPCreateWidget(aX + 20, aY, aX + aW + 20, aY - aH + 120, 1, "                *-*-*-*-*-*  Pause For Me!!!  *-*-*-*-*-*"
@@ -1965,7 +1985,7 @@ float CallBackXPlane(float  inElapsedSinceLastCall,
 				XPSetWidgetProperty(c1, xpProperty_CaptionLit, 0);
 				XPWidgetID c2 = XPCreateWidget(aX + 20, aY, aX + aW + 20, aY - aH, 1, msgPause, 0, wAlertWindow, xpWidgetClass_Caption);
 				XPSetWidgetProperty(c2, xpProperty_CaptionLit, 0);
-				wBtnAlertWindowClose = XPCreateWidget(aX + 110, aY, aX + 210, aY - aH - 80, 1, "  Close  ", 0, wAlertWindow, xpWidgetClass_Button);
+				wBtnAlertWindowClose = XPCreateWidget(aX + 180, aY, aX + 260, aY - aH - 80, 1, "  Close  ", 0, wAlertWindow, xpWidgetClass_Button);
 				XPSetWidgetProperty(wBtnAlertWindowClose, xpProperty_ButtonType, xpPushButton);
 				XPAddWidgetCallback(wAlertWindow, widgetWidgetHandler);
 				AlertWindowShown = 1;
@@ -2225,6 +2245,27 @@ int SetupOffCommandHandler(XPLMCommandRef inCommand, XPLMCommandPhase inPhase, v
 		MenuItem1 = 0;
 	}
 	return 0;
+}
+
+void resetDataRefsValues() {
+	if (isDataRef1Selected == 0) {
+		XPSetWidgetDescriptor(wCaptionDataRef1, "----");
+		XPSetWidgetProperty(wCaptionDataRef1, xpProperty_CaptionLit, 0);
+	}
+	if (isDataRef2Selected == 0) {
+		XPSetWidgetDescriptor(wCaptionDataRef2, "----");
+		XPSetWidgetProperty(wCaptionDataRef2, xpProperty_CaptionLit, 0);
+	}
+	if (isDataRef3Selected == 0) {
+		XPSetWidgetDescriptor(wCaptionDataRef3, "----");
+		XPSetWidgetProperty(wCaptionDataRef3, xpProperty_CaptionLit, 0);
+	}
+}
+
+void log(std::string s) {
+	XPLMDebugString(" ---> LOG:");
+	XPLMDebugString(s.c_str());
+	XPLMDebugString("\n");
 }
 
 void	draw_hello_world(XPLMWindowID in_window_id, void * in_refcon)
