@@ -41,7 +41,11 @@
 
 #pragma warning(disable: 4996)
 #pragma warning(disable: 4244)
+#pragma warning(disable: 4267)
 
+#include "SocketServer.h"
+#include <websocketpp/config/asio_no_tls.hpp>
+#include <websocketpp/server.hpp>
 #include <algorithm>
 #include "XPLMDisplay.h"
 #include "XPLMGraphics.h"
@@ -61,9 +65,12 @@
 #include <sstream>
 #include <iomanip>
 #include <fstream>
+#include <thread>
 #include "Coordenada.h"
 #include "NavaidManager.h"
 #include "Navaid.h"
+
+
 
 #if IBM
     #include <windows.h>
@@ -245,8 +252,16 @@ void resetDataRefsValues();
 XPLMCommandRef SetupOnCommand = NULL;
 XPLMCommandRef SetupOffCommand = NULL;
 
+std::thread threadTaskSocketServer;
+SocketServer* socketServer;
+
 int SetupOnCommandHandler(XPLMCommandRef inCommand, XPLMCommandPhase inPhase, void * inRefcon);
 int SetupOffCommandHandler(XPLMCommandRef inCommand, XPLMCommandPhase inPhase, void * inRefcon);
+
+void taskSocketServer(SocketServer* socketServer) {
+	log("Starting Socket Server");
+	socketServer->start();
+}
 
 PLUGIN_API int XPluginStart(
 	char *		outName,
@@ -255,6 +270,9 @@ PLUGIN_API int XPluginStart(
 {
 	checkPreferenceFile();
 
+	socketServer = new SocketServer(9002);
+	threadTaskSocketServer = std::thread(taskSocketServer, socketServer);
+	
 	strcpy(outName, "PauseForMe");
 	strcpy(outSig, "br.sp.ualter.junior.PauseForMe");
 	strcpy(outDesc, "A plug-in to pause at a specific time you want, while you are going to have a shower :-)");
@@ -295,6 +313,8 @@ std::string formatFreqHz(float number)
 	str.append("hz");
 	return str;
 }
+
+
 
 std::string convertToString(long number)
 {
@@ -1035,7 +1055,6 @@ void CreateWidgetWindow()
 	//// Limit resizing our window: maintain a minimum width/height of 100 boxels and a max width/height of 300 boxels
 	//XPLMSetWindowResizingLimits(g_window, 200, 200, 300, 300);
 	//XPLMSetWindowTitle(g_window, "Pause for Me");
-
 
 	XPAddWidgetCallback(wMainWindow, widgetWidgetHandler);
 }
@@ -1967,8 +1986,8 @@ float CallBackXPlane(float  inElapsedSinceLastCall,
 	int    inCounter,
 	void * inRefcon)
 {
+	//PAUSE CHECKING
 	getXPlaneDataInfos();
-
 	float pause = pauseXPlane();
 	if (pause) {
 		if (!isGamePaused)
@@ -1995,6 +2014,11 @@ float CallBackXPlane(float  inElapsedSinceLastCall,
 				XPSetWidgetProperty(wChkToUnSelect, xpProperty_ButtonState, 0);
 		}
 	}
+
+	//REMOTE MOBILE APPLICATION FEEDING
+	//socketServer->broadcast("Hello from X-Plane Plugin");
+
+
 	return CHECKINTERVAL;
 }
 
@@ -2002,6 +2026,9 @@ float CallBackXPlane(float  inElapsedSinceLastCall,
 
 PLUGIN_API void	XPluginStop(void)
 {
+	socketServer->stop();
+	threadTaskSocketServer.join();
+
 	XPLMUnregisterFlightLoopCallback(CallBackXPlane, NULL);
 	XPLMUnregisterCommandHandler(SetupOnCommand, SetupOnCommandHandler, 0, 0);
 	XPLMUnregisterCommandHandler(SetupOffCommand, SetupOffCommandHandler, 0, 0);

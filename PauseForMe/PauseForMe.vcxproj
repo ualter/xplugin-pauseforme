@@ -142,7 +142,7 @@
       <IntrinsicFunctions>false</IntrinsicFunctions>
       <SDLCheck>
       </SDLCheck>
-      <AdditionalIncludeDirectories>SDK\CHeaders\XPLM;SDK\CHeaders\Widgets;%(AdditionalIncludeDirectories)</AdditionalIncludeDirectories>
+      <AdditionalIncludeDirectories>d:\Developer\apps\vcpkg\packages\boost-system_x64-windows\include\boost\system\detail\;d:\Developer\apps\vcpkg\packages\boost-system_x64-windows\include\boost\;d:\Developer\apps\vcpkg\packages\boost-system_x64-windows\include\boost\system;SDK\CHeaders\XPLM;SDK\CHeaders\Widgets;%(AdditionalIncludeDirectories)</AdditionalIncludeDirectories>
       <UndefinePreprocessorDefinitions>
       </UndefinePreprocessorDefinitions>
       <PreprocessorDefinitions>WIN32;NDEBUG;_WINDOWS;_USRDLL;SIMDATA_EXPORTS;IBM=1;XPLM200=1;XPLM210=1;XPLM300=1;XPLM301=1;_CRT_SECURE_NO_WARNINGS;%(PreprocessorDefinitions)</PreprocessorDefinitions>
@@ -155,6 +155,7 @@
       <AssemblerListingLocation>.\Release\64\</AssemblerListingLocation>
       <ObjectFileName>.\Release\64\</ObjectFileName>
       <ProgramDataBaseFileName>.\Release\64\</ProgramDataBaseFileName>
+      <AssemblerOutput>NoListing</AssemblerOutput>
     </ClCompile>
     <Link>
       <GenerateDebugInformation>DebugFull</GenerateDebugInformation>
@@ -162,8 +163,8 @@
       </EnableCOMDATFolding>
       <OptimizeReferences>
       </OptimizeReferences>
-      <AdditionalLibraryDirectories>SDK\Libraries\Win;%(AdditionalLibraryDirectories)</AdditionalLibraryDirectories>
-      <AdditionalDependencies>Opengl32.lib;odbc32.lib;odbccp32.lib;XPLM_64.lib;XPWidgets_64.lib;%(AdditionalDependencies)</AdditionalDependencies>
+      <AdditionalLibraryDirectories>d:\Developer\apps\vcpkg\packages\boost-system_x64-windows\lib;SDK\Libraries\Win;%(AdditionalLibraryDirectories)</AdditionalLibraryDirectories>
+      <AdditionalDependencies>Opengl32.lib;odbc32.lib;odbccp32.lib;XPLM_64.lib;XPWidgets_64.lib;boost_system-vc140-mt.lib;%(AdditionalDependencies)</AdditionalDependencies>
       <MidlCommandFile>
       </MidlCommandFile>
       <SubSystem>Console</SubSystem>
@@ -178,11 +179,13 @@
       <AdditionalIncludeDirectories Condition="'$(Configuration)|$(Platform)'=='Release|x64'">SDK\CHeaders\XPLM;SDK\CHeaders\Widgets;%(AdditionalIncludeDirectories)</AdditionalIncludeDirectories>
     </ClCompile>
     <ClCompile Include="PauseForMeWin.cpp" />
+    <ClCompile Include="SocketServer.cpp" />
   </ItemGroup>
   <ItemGroup>
     <ClInclude Include="Coordenada.h" />
     <ClInclude Include="Navaid.h" />
     <ClInclude Include="NavaidManager.h" />
+    <ClInclude Include="SocketServer.h" />
   </ItemGroup>
   <Import Project="$(VCTargetsPath)\Microsoft.Cpp.targets" />
   <ImportGroup Label="ExtensionTargets">
