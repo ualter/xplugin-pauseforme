@@ -102,7 +102,7 @@
 #define CHECKINTERVAL 1.5 //seconds between checks
 
 static XPWidgetID wCaptionNav1, wCaptionNav2;
-static XPWidgetID wMainWindow, wSubWindow, wBtnSave, wBtnReload, wBtnCancel;
+static XPWidgetID wMainWindow, wSubWindow, wBtnSave, wBtnReload, wBtnCancel, wBtnStopWebSocket;
 static XPWidgetID wCaptionFreqNav1, wCaptionFreqNav2, wCaptionDistDmeNav1, wCaptionDistDmeNav2;
 static XPWidgetID wTextDistDmeMaxNav1, wTextDistDmeMaxNav2, wTextDistDmeMinNav1, wTextDistDmeMinNav2;
 static XPWidgetID wCaptionTimeDmeNav1, wCaptionTimeDmeNav2;
@@ -241,6 +241,10 @@ float CallBackXPlane(float  inElapsedSinceLastCall,
 	float  inElapsedTimeSinceLastFlightLoop,
 	int    inCounter,
 	void * inRefcon);
+float CallBackXPlaneSocketServer(float  inElapsedSinceLastCall,
+	float  inElapsedTimeSinceLastFlightLoop,
+	int    inCounter,
+	void * inRefcon);
 static void PauseForMeMenuHandler(void *, void *);
 
 void checkPreferenceFile();
@@ -272,6 +276,7 @@ PLUGIN_API int XPluginStart(
 
 	socketServer = new SocketServer(9002);
 	threadTaskSocketServer = std::thread(taskSocketServer, socketServer);
+	XPLMRegisterFlightLoopCallback(CallBackXPlaneSocketServer, 1.0, NULL);
 	
 	strcpy(outName, "PauseForMe");
 	strcpy(outSig, "br.sp.ualter.junior.PauseForMe");
@@ -1013,6 +1018,11 @@ void CreateWidgetWindow()
 	wBtnReload = XPCreateWidget(leftX, topY-5, leftX+80, bottomY,1,"Reload",0,wMainWindow,xpWidgetClass_Button);
 	XPSetWidgetProperty(wBtnReload,xpProperty_ButtonType,xpPushButton);
 
+	leftX += 200;
+	bottomY = topY - heightFields;
+	wBtnStopWebSocket = XPCreateWidget(leftX, topY - 5, leftX + 80, bottomY, 1, "Stop WebSocket", 0, wMainWindow, xpWidgetClass_Button);
+	XPSetWidgetProperty(wBtnStopWebSocket, xpProperty_ButtonType, xpPushButton);
+
 	// Just For Debug Purposes
 	topY -= 15;
 	bottomY = topY-heightFields;
@@ -1258,6 +1268,13 @@ int widgetWidgetHandler(XPWidgetMessage			inMessage,
 		if (inParam1 == (intptr_t)wBtnReload)
 		{
 			XPLMReloadPlugins();
+			return 1;
+		}
+		if (inParam1 == (intptr_t)wBtnStopWebSocket)
+		{
+			socketServer->broadcast("Stopping...  bye!");
+			socketServer->stop();
+			threadTaskSocketServer.join();
 			return 1;
 		}
 	}
@@ -2015,9 +2032,48 @@ float CallBackXPlane(float  inElapsedSinceLastCall,
 		}
 	}
 
-	//REMOTE MOBILE APPLICATION FEEDING
-	//socketServer->broadcast("Hello from X-Plane Plugin");
+	return CHECKINTERVAL;
+}
 
+float CallBackXPlaneSocketServer(float  inElapsedSinceLastCall,
+	float  inElapsedTimeSinceLastFlightLoop,
+	int    inCounter,
+	void * inRefcon)
+{
+	double currentLatitude  = XPLMGetDatad(XPLMFindDataRef("sim/flightmodel/position/latitude"));
+	double currentLongitude = XPLMGetDatad(XPLMFindDataRef("sim/flightmodel/position/longitude"));
+	int    isGamePaused     = XPLMGetDatai(XPLMFindDataRef("sim/time/paused"));
+
+	//currentFreqNav1
+	//currentDistDmeNav1
+	//currentTimeDmeNav1
+	//currentFreqNav2
+	//currentTimeDmeNav2
+	//currentDistDmeNav2
+
+	double gpsDMEDistM    = XPLMGetDatad(XPLMFindDataRef("sim/cockpit/radios/gps_dme_dist_m"));
+	double gpsDMETimeSecs = XPLMGetDatad(XPLMFindDataRef("sim/cockpit/radios/gps_dme_time_secs"));
+	//double airspeed       = XPLMGetDatad(XPLMFindDataRef("sim/cockpit2/gauges/indicators/airspeed_kts_pilot"));
+	//currentAirspeed
+	//double vsFpm = XPLMGetDatad(XPLMFindDataRef("sim/cockpit2/gauges/indicators/vvi_fpm_pilot"));
+	//double groundspeed = XPLMGetDatad(XPLMFindDataRef("sim/flightmodel/position/groundspeed"));
+
+
+	//float vlr[9] = {};
+	//XPLMGetDatavf(XPLMFindDataRef("sim/cockpit2/fuel/fuel_quantity"), vlr, 1, 1);
+
+	//REMOTE MOBILE APPLICATION FEEDING
+	std::ostringstream oss;
+	oss << "{";
+	oss << "   \"airplane\":";
+	oss << "   {";
+	oss << "     \"lat\":" << currentLatitude;
+	oss << "    ,\"lng\":" << currentLongitude;
+	oss << "   }";
+	oss << "  ,\"isPaused:\"" << std::to_string(isGamePaused);
+	oss << "  ,\"isBatteryOn\":" << std::to_string(isBatteryOn);
+	oss << "}";
+	socketServer->broadcast("PauseForMe: " + oss.str());
 
 	return CHECKINTERVAL;
 }
@@ -2026,10 +2082,14 @@ float CallBackXPlane(float  inElapsedSinceLastCall,
 
 PLUGIN_API void	XPluginStop(void)
 {
+	log("Stop Socket Server!");
+	socketServer->broadcast("Stopping...  bye!");
 	socketServer->stop();
 	threadTaskSocketServer.join();
+	log("Stopped Socket Server!");
 
 	XPLMUnregisterFlightLoopCallback(CallBackXPlane, NULL);
+	XPLMUnregisterFlightLoopCallback(CallBackXPlaneSocketServer, NULL);
 	XPLMUnregisterCommandHandler(SetupOnCommand, SetupOnCommandHandler, 0, 0);
 	XPLMUnregisterCommandHandler(SetupOffCommand, SetupOffCommandHandler, 0, 0);
 }

@@ -1,4 +1,5 @@
 #include "SocketServer.h"
+#include "XPLMUtilities.h"
 
 SocketServer::SocketServer(int port) {
 	this->port = port;
@@ -16,7 +17,9 @@ void SocketServer::broadcast(string message) {
 			this->wsServer.send(connection, message, websocketpp::frame::opcode::text);
 		}
 		catch (websocketpp::exception const & e) {
-			//std::cout << "Failed send message to client..: " << "(" << e.what() << ")" << std::endl;
+			std::string error = e.what();
+			std::string msg = "SocketServer::broadcast() --> ERROR --> " + error;
+			XPLMDebugString(msg.c_str());
 		}
 	}
 }
@@ -27,16 +30,12 @@ void SocketServer::on_open(websocketpp::connection_hdl hdl) {
 	data.sessionid = this->sessionId++;
 	data.name = "Connection " + std::to_string(data.sessionid);
 
-	// std::cout << "Open connection with " << data.name << " with sessionid " << data.sessionid << std::endl;
-
 	this->connections[hdl] = data;
 	this->arraySocketClients.push_back(hdl);
 }
 
 void SocketServer::on_close(websocketpp::connection_hdl hdl) {
 	connection_data& data = get_data_from_hdl(hdl);
-
-	//std::cout << "Closing connection " << data.name << " with sessionid " << data.sessionid << std::endl;
 
 	this->connections.erase(hdl);
 }
@@ -45,8 +44,6 @@ connection_data& SocketServer::get_data_from_hdl(websocketpp::connection_hdl hdl
 	auto it = this->connections.find(hdl);
 
 	if (it == this->connections.end()) {
-		// this connection is not in the list. This really shouldn't happen
-		// and probably means something else is wrong.
 		throw std::invalid_argument("No data avaliable for session");
 	}
 
@@ -67,7 +64,9 @@ void SocketServer::on_message(websocketpp::connection_hdl hdl, message_ptr msg) 
 		this->wsServer.send(hdl, msg->get_payload(), msg->get_opcode());
 	}
 	catch (websocketpp::exception const & e) {
-		//std::cout << "Echo failed because: " << "(" << e.what() << ")" << std::endl;
+		std::string error = e.what();
+		std::string msg = "SocketServer::on_message() --> ERROR --> " + error;
+		XPLMDebugString(msg.c_str());
 	}
 }
 
@@ -82,20 +81,47 @@ void SocketServer::start() {
 		this->wsServer.set_close_handler(bind(&SocketServer::on_close, this, ::_1));
 		this->wsServer.listen(this->port);
 
-		//cout << "Listening on " << this->port << "..." << std::endl;
-
+		XPLMDebugString(">>>");
+		XPLMDebugString("SocketServer::start() --> Listening...");
+		XPLMDebugString(">>>");
+		
 		this->wsServer.start_accept();
 		this->wsServer.run();
 
 	}
 	catch (websocketpp::exception const & e) {
-		//std::cout << e.what() << std::endl;
+		std::string error = e.what();
+		std::string msg = "SocketServer::start() --> ERROR --> " + error;
+		XPLMDebugString(msg.c_str());
 	}
 	catch (...) {
-		//std::cout << "Error!!!" << std::endl;
+		XPLMDebugString("SocketServer::start() --> ERROR!");
 	}
 }
 
 void SocketServer::stop() {
+	XPLMDebugString(">>>");
+	XPLMDebugString("SocketServer::stop() -->  STOPPING" );
+	XPLMDebugString(">>>");
+
+	for (auto const& pair : this->connections) {
+		websocketpp::connection_hdl connection = pair.first;
+
+		try {
+			this->wsServer.pause_reading(connection);
+			this->wsServer.close(connection, websocketpp::close::status::going_away, "Server Stopped");
+		}
+		catch (websocketpp::exception const & e) {
+			std::string error  = e.what();
+			std::string msg    = "SocketServer::stop() --> ERROR --> " + error;
+			XPLMDebugString(msg.c_str());
+		}
+	}
+
 	this->wsServer.stop_listening();
+
+	XPLMDebugString(">>>");
+	XPLMDebugString("SocketServer::stop() -->  STOPPED!");
+	XPLMDebugString(">>>");
 }
+
