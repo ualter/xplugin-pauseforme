@@ -173,6 +173,7 @@
     </Link>
   </ItemDefinitionGroup>
   <ItemGroup>
+    <ClCompile Include="CallBackHandler.cpp" />
     <ClCompile Include="Coordenada.cpp" />
     <ClCompile Include="NavaidManager.cpp" />
     <ClCompile Include="PauseForMe.cpp">
@@ -182,6 +183,7 @@
     <ClCompile Include="SocketServer.cpp" />
   </ItemGroup>
   <ItemGroup>
+    <ClInclude Include="CallBackHandler.h" />
     <ClInclude Include="Coordenada.h" />
     <ClInclude Include="Navaid.h" />
     <ClInclude Include="NavaidManager.h" />

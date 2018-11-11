@@ -50,6 +50,11 @@ connection_data& SocketServer::get_data_from_hdl(websocketpp::connection_hdl hdl
 	return it->second;
 }
 
+void SocketServer::setCallBack(CallBackHandler* callBackHandler)
+{	
+	this->callBackhandler = callBackHandler;
+}
+
 void SocketServer::on_message(websocketpp::connection_hdl hdl, message_ptr msg) {
 	std::string message = msg->get_payload();
 
@@ -60,14 +65,8 @@ void SocketServer::on_message(websocketpp::connection_hdl hdl, message_ptr msg) 
 		return;
 	}
 
-	try {
-		this->wsServer.send(hdl, msg->get_payload(), msg->get_opcode());
-	}
-	catch (websocketpp::exception const & e) {
-		std::string error = e.what();
-		std::string msg = "SocketServer::on_message() --> ERROR --> " + error;
-		XPLMDebugString(msg.c_str());
-	}
+	std::string logMsg = "SocketServer::on_message() --> RECEIVED --> " + message;
+	this->callBackhandler->acceptMessage(message);
 }
 
 void SocketServer::start() {
@@ -124,4 +123,6 @@ void SocketServer::stop() {
 	XPLMDebugString("SocketServer::stop() -->  STOPPED!");
 	XPLMDebugString(">>>");
 }
+
+
 

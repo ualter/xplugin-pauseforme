@@ -69,6 +69,7 @@
 #include "Coordenada.h"
 #include "NavaidManager.h"
 #include "Navaid.h"
+#include "CallBackHandler.h"
 
 
 
@@ -234,6 +235,8 @@ std::string fileName = "PauseForMe.ini";
 Coordenada objCurrentLongitude(2), objCurrentLatitude(2), objUserLongitude(2), objUserLatitude(2);
 int acceptableDifference = 2;
 
+std::string *xpMovilCommand = nullptr;
+
 //float currentLongitude, currentLatitude;
 //std::string  currentLongitudeStr, currentLatitudeStr;
 
@@ -262,10 +265,14 @@ SocketServer* socketServer;
 int SetupOnCommandHandler(XPLMCommandRef inCommand, XPLMCommandPhase inPhase, void * inRefcon);
 int SetupOffCommandHandler(XPLMCommandRef inCommand, XPLMCommandPhase inPhase, void * inRefcon);
 
+using namespace std::placeholders;
+
 void taskSocketServer(SocketServer* socketServer) {
 	log("Starting Socket Server");
 	socketServer->start();
 }
+
+CallBackHandler* callBackHandler;
 
 PLUGIN_API int XPluginStart(
 	char *		outName,
@@ -275,6 +282,8 @@ PLUGIN_API int XPluginStart(
 	checkPreferenceFile();
 
 	socketServer = new SocketServer(9002);
+	callBackHandler = new CallBackHandler();
+	socketServer->setCallBack(callBackHandler);
 	threadTaskSocketServer = std::thread(taskSocketServer, socketServer);
 	XPLMRegisterFlightLoopCallback(CallBackXPlaneSocketServer, 1.0, NULL);
 	
@@ -1032,39 +1041,6 @@ void CreateWidgetWindow()
 	widgetDebug2 = XPCreateWidget(leftX, topY, leftX+80, bottomY,1,"Debug2!",0,wMainWindow,xpWidgetClass_Caption);
 	leftX += 160;
 	widgetDebug3 = XPCreateWidget(leftX, topY, leftX+80, bottomY,1,"Debug3!",0,wMainWindow,xpWidgetClass_Caption);
-
-	// AQUI
-	//XPLMCreateWindow_t params;
-	//params.structSize = sizeof(params);
-	//params.visible = 1;
-	//params.drawWindowFunc = draw_hello_world;
-	//// Note on "dummy" handlers:
-	//// Even if we don't want to handle these events, we have to register a "do-nothing" callback for them
-	//params.handleMouseClickFunc = dummy_mouse_handler;
-	//params.handleRightClickFunc = dummy_mouse_handler;
-	//params.handleMouseWheelFunc = dummy_wheel_handler;
-	//params.handleKeyFunc = dummy_key_handler;
-	//params.handleCursorFunc = dummy_cursor_status_handler;
-	//params.refcon = NULL;
-	//params.layer = xplm_WindowLayerFloatingWindows;
-	//// Opt-in to styling our window like an X-Plane 11 native window
-	//// If you're on XPLM300, not XPLM301, swap this enum for the literal value 1.
-	//params.decorateAsFloatingWindow = xplm_WindowDecorationRoundRectangle;
-	//// Set the window's initial bounds
-	//// Note that we're not guaranteed that the main monitor's lower left is at (0, 0)...
-	//// We'll need to query for the global desktop bounds!
-	//int left, bottom, right, top;
-	//XPLMGetScreenBoundsGlobal(&left, &top, &right, &bottom);
-	//params.left = left + 50;
-	//params.bottom = bottom + 150;
-	//params.right = params.left + 200;
-	//params.top = params.bottom + 200;
-	//g_window = XPLMCreateWindowEx(&params);
-	//// Position the window as a "free" floating window, which the user can drag around
-	//XPLMSetWindowPositioningMode(g_window, xplm_WindowPositionFree, -1);
-	//// Limit resizing our window: maintain a minimum width/height of 100 boxels and a max width/height of 300 boxels
-	//XPLMSetWindowResizingLimits(g_window, 200, 200, 300, 300);
-	//XPLMSetWindowTitle(g_window, "Pause for Me");
 
 	XPAddWidgetCallback(wMainWindow, widgetWidgetHandler);
 }
@@ -2003,7 +1979,7 @@ float CallBackXPlane(float  inElapsedSinceLastCall,
 	int    inCounter,
 	void * inRefcon)
 {
-	//PAUSE CHECKING
+	//PAUSE CHECKING via SCREEN USER PARAMETERS
 	getXPlaneDataInfos();
 	float pause = pauseXPlane();
 	if (pause) {
@@ -2031,6 +2007,47 @@ float CallBackXPlane(float  inElapsedSinceLastCall,
 				XPSetWidgetProperty(wChkToUnSelect, xpProperty_ButtonState, 0);
 		}
 	}
+	// NOW CHECK IF THE MOBILE APP HAS ASKED SOMETHING
+	std::string logMsg = "PauseForMe --> " + callBackHandler->getCommand();
+	XPLMDebugString(logMsg.c_str());
+	// PAUSE/UNPAUSE REQUESTED BY MOBILE APP
+	if (callBackHandler->getCommand().compare("{PAUSE}") == 0) {
+		XPLMCommandKeyStroke(xplm_key_pause);
+		callBackHandler->commandExecuted();
+
+		XPLMCreateWindow_t params;
+		params.structSize = sizeof(params);
+		params.visible = 1;
+		params.drawWindowFunc = draw_hello_world;
+		// Note on "dummy" handlers:
+		// Even if we don't want to handle these events, we have to register a "do-nothing" callback for them
+		params.handleMouseClickFunc = dummy_mouse_handler;
+		params.handleRightClickFunc = dummy_mouse_handler;
+		params.handleMouseWheelFunc = dummy_wheel_handler;
+		params.handleKeyFunc = dummy_key_handler;
+		params.handleCursorFunc = dummy_cursor_status_handler;
+		params.refcon = NULL;
+		params.layer = xplm_WindowLayerFloatingWindows;
+		// Opt-in to styling our window like an X-Plane 11 native window
+		// If you're on XPLM300, not XPLM301, swap this enum for the literal value 1.
+		params.decorateAsFloatingWindow = xplm_WindowDecorationRoundRectangle;
+		// Set the window's initial bounds
+		// Note that we're not guaranteed that the main monitor's lower left is at (0, 0)...
+		// We'll need to query for the global desktop bounds!
+		int left, bottom, right, top;
+		XPLMGetScreenBoundsGlobal(&left, &top, &right, &bottom);
+		params.left = left + 50;
+		params.bottom = bottom + 150;
+		params.right = params.left + 200;
+		params.top = params.bottom + 200;
+		g_window = XPLMCreateWindowEx(&params);
+		// Position the window as a "free" floating window, which the user can drag around
+		XPLMSetWindowPositioningMode(g_window, xplm_WindowPositionFree, -1);
+		// Limit resizing our window: maintain a minimum width/height of 100 boxels and a max width/height of 300 boxels
+		XPLMSetWindowResizingLimits(g_window, 200, 200, 300, 300);
+		XPLMSetWindowTitle(g_window, "Pause for Me");
+	}
+	
 
 	return CHECKINTERVAL;
 }
@@ -2042,38 +2059,31 @@ float CallBackXPlaneSocketServer(float  inElapsedSinceLastCall,
 {
 	double currentLatitude  = XPLMGetDatad(XPLMFindDataRef("sim/flightmodel/position/latitude"));
 	double currentLongitude = XPLMGetDatad(XPLMFindDataRef("sim/flightmodel/position/longitude"));
-	int    isGamePaused     = XPLMGetDatai(XPLMFindDataRef("sim/time/paused"));
+	int    currentAltitude  = (int)XPLMGetDataf(XPLMFindDataRef("sim/cockpit2/gauges/indicators/altitude_ft_pilot"));
+	double gpsDMEDistM      = XPLMGetDatad(XPLMFindDataRef("sim/cockpit/radios/gps_dme_dist_m"));
+	double gpsDMETimeSecs   = XPLMGetDatad(XPLMFindDataRef("sim/cockpit/radios/gps_dme_time_secs"));
+	double airspeed         = XPLMGetDatad(XPLMFindDataRef("sim/cockpit2/gauges/indicators/airspeed_kts_pilot"));
+	double vsFpm            = XPLMGetDatad(XPLMFindDataRef("sim/cockpit2/gauges/indicators/vvi_fpm_pilot"));
+	double groundspeed      = XPLMGetDatad(XPLMFindDataRef("sim/flightmodel/position/groundspeed"));
 
-	//currentFreqNav1
-	//currentDistDmeNav1
-	//currentTimeDmeNav1
-	//currentFreqNav2
-	//currentTimeDmeNav2
-	//currentDistDmeNav2
-
-	double gpsDMEDistM    = XPLMGetDatad(XPLMFindDataRef("sim/cockpit/radios/gps_dme_dist_m"));
-	double gpsDMETimeSecs = XPLMGetDatad(XPLMFindDataRef("sim/cockpit/radios/gps_dme_time_secs"));
-	//double airspeed       = XPLMGetDatad(XPLMFindDataRef("sim/cockpit2/gauges/indicators/airspeed_kts_pilot"));
-	//currentAirspeed
-	//double vsFpm = XPLMGetDatad(XPLMFindDataRef("sim/cockpit2/gauges/indicators/vvi_fpm_pilot"));
-	//double groundspeed = XPLMGetDatad(XPLMFindDataRef("sim/flightmodel/position/groundspeed"));
-
-
-	//float vlr[9] = {};
-	//XPLMGetDatavf(XPLMFindDataRef("sim/cockpit2/fuel/fuel_quantity"), vlr, 1, 1);
+	int    isGamePaused = XPLMGetDatai(XPLMFindDataRef("sim/time/paused"));
 
 	//REMOTE MOBILE APPLICATION FEEDING
 	std::ostringstream oss;
 	oss << "{";
 	oss << "   \"airplane\":";
 	oss << "   {";
-	oss << "     \"lat\":" << currentLatitude;
-	oss << "    ,\"lng\":" << currentLongitude;
+	oss << "     \"lat\":"             << currentLatitude;
+	oss << "    ,\"lng\":"             << currentLongitude;
+	oss << "    ,\"airspeed\":"        << airspeed;
+	oss << "    ,\"groundspeed\":"     << vsFpm;
+	oss << "    ,\"vsFpm\":"           << vsFpm;
+	oss << "    ,\"currentAltitude\":" << currentAltitude;
 	oss << "   }";
-	oss << "  ,\"isPaused:\"" << std::to_string(isGamePaused);
+	oss << "  ,\"isPaused\":" << std::to_string(isGamePaused);
 	oss << "  ,\"isBatteryOn\":" << std::to_string(isBatteryOn);
 	oss << "}";
-	socketServer->broadcast("PauseForMe: " + oss.str());
+	socketServer->broadcast(oss.str());
 
 	return CHECKINTERVAL;
 }
@@ -2334,6 +2344,8 @@ int SetupOffCommandHandler(XPLMCommandRef inCommand, XPLMCommandPhase inPhase, v
 	return 0;
 }
 
+
+
 void resetDataRefsValues() {
 	if (isDataRef1Selected == 0) {
 		XPSetWidgetDescriptor(wCaptionDataRef1, "----");
@@ -2374,5 +2386,5 @@ void	draw_hello_world(XPLMWindowID in_window_id, void * in_refcon)
 
 	float col_white[] = { 1.0, 1.0, 1.0 }; // red, green, blue
 
-	XPLMDrawString(col_white, l + 10, t - 20, "Hello world!", NULL, xplmFont_Proportional);
+	XPLMDrawString(col_white, l + 10, t - 20, "Paused by Movil!", NULL, xplmFont_Proportional);
 }

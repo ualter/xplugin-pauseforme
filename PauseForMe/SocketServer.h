@@ -5,6 +5,7 @@
 #include <websocketpp/server.hpp>
 #include <string>
 #include <vector>
+#include "CallBackHandler.h"
 
 using namespace std;
 
@@ -33,10 +34,12 @@ public:
 	void on_close(websocketpp::connection_hdl hdl);
 	void on_message(websocketpp::connection_hdl hdl, message_ptr msg);
 	connection_data& get_data_from_hdl(websocketpp::connection_hdl hdl);
+	void setCallBack(CallBackHandler* callBack);
 private:
 	int port;
 	server wsServer;
 	int sessionId;
 	con_list connections;
 	vector<websocketpp::connection_hdl> arraySocketClients;
+	CallBackHandler* callBackhandler;
 };
