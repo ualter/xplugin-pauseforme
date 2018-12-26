@@ -103,7 +103,7 @@
 #define CHECKINTERVAL 1.5 //seconds between checks
 
 static XPWidgetID wCaptionNav1, wCaptionNav2;
-static XPWidgetID wMainWindow, wSubWindow, wBtnSave, wBtnReload, wBtnCancel, wBtnStopWebSocket;
+static XPWidgetID wMainWindow, wSubWindow, wBtnSave, wBtnReload, wBtnCancel, wBtnStopStartWebSocket;
 static XPWidgetID wCaptionFreqNav1, wCaptionFreqNav2, wCaptionDistDmeNav1, wCaptionDistDmeNav2;
 static XPWidgetID wTextDistDmeMaxNav1, wTextDistDmeMaxNav2, wTextDistDmeMinNav1, wTextDistDmeMinNav2;
 static XPWidgetID wCaptionTimeDmeNav1, wCaptionTimeDmeNav2;
@@ -228,6 +228,7 @@ int userAltitudeMin = -1, userAltitudeMax = 99999;
 int userAirspeedMin = -1, userAirspeedMax = 99999;
 static int MenuItem1;
 static int AlertWindowShown;
+static int serverSocketStarted = 0;
 char debug_message[128];
 char msgPause[128];
 std::string fileName = "PauseForMe.ini";
@@ -256,6 +257,16 @@ void log(std::string s);
 
 void resetDataRefsValues();
 
+void switchSocketServer();
+void stopSocketServer();
+void startSocketServer();
+
+void sendStoppedMessageSocketClients();
+void sendStartedMessageSocketClients();
+void sendPausedMessageSocketClients();
+void sendUnpausedMessageSocketClients();
+void sendMessageSocketClients(std::string msg);
+
 XPLMCommandRef SetupOnCommand = NULL;
 XPLMCommandRef SetupOffCommand = NULL;
 
@@ -272,6 +283,7 @@ void taskSocketServer(SocketServer* socketServer) {
 	socketServer->start();
 }
 
+
 CallBackHandler* callBackHandler;
 
 PLUGIN_API int XPluginStart(
@@ -279,34 +291,40 @@ PLUGIN_API int XPluginStart(
 	char *		outSig,
 	char *		outDesc)
 {
-	checkPreferenceFile();
+	try {
+		checkPreferenceFile();
 
-	socketServer = new SocketServer(9002);
-	callBackHandler = new CallBackHandler();
-	socketServer->setCallBack(callBackHandler);
-	threadTaskSocketServer = std::thread(taskSocketServer, socketServer);
-	XPLMRegisterFlightLoopCallback(CallBackXPlaneSocketServer, 1.0, NULL);
-	
-	strcpy(outName, "PauseForMe");
-	strcpy(outSig, "br.sp.ualter.junior.PauseForMe");
-	strcpy(outDesc, "A plug-in to pause at a specific time you want, while you are going to have a shower :-)");
+		//startSocketServer();
 
-	// Create our commands; these will increment and decrement our custom dataref.
-	SetupOnCommand = XPLMCreateCommand("Ualter/PauseForMe/SetupOn", "Open Setup window");
-	SetupOffCommand = XPLMCreateCommand("Ualter/PauseForMe/SetupOff", "Close Setup window");
-	// Register our custom commands
-	XPLMRegisterCommandHandler(SetupOnCommand, SetupOnCommandHandler, 1, (void *)0);
-	XPLMRegisterCommandHandler(SetupOffCommand, SetupOffCommandHandler, 1, (void *)0);
+		strcpy(outName, "PauseForMe");
+		strcpy(outSig, "br.sp.ualter.junior.PauseForMe");
+		strcpy(outDesc, "A plug-in to pause at a specific time you want, while you are going to have a shower :-)");
 
-	// Build menu
-	int item;
-	item = XPLMAppendMenuItem(XPLMFindPluginsMenu(), "Pause For Me", NULL, 1);
-	id = XPLMCreateMenu("Menu Pause For Me", XPLMFindPluginsMenu(), item, PauseForMeMenuHandler, NULL);
-	XPLMAppendMenuItem(id, "Setup", (void *)"Setup", 1);
+		// Create our commands; these will increment and decrement our custom dataref.
+		SetupOnCommand = XPLMCreateCommand("Ualter/PauseForMe/SetupOn", "Open Setup window");
+		SetupOffCommand = XPLMCreateCommand("Ualter/PauseForMe/SetupOff", "Close Setup window");
+		// Register our custom commands
+		XPLMRegisterCommandHandler(SetupOnCommand, SetupOnCommandHandler, 1, (void *)0);
+		XPLMRegisterCommandHandler(SetupOffCommand, SetupOffCommandHandler, 1, (void *)0);
 
-	// Used by widget to make sure only one widgets instance created
-	MenuItem1 = 0;
+		// Build menu
+		int item;
+		item = XPLMAppendMenuItem(XPLMFindPluginsMenu(), "Pause For Me", NULL, 1);
+		id = XPLMCreateMenu("Menu Pause For Me", XPLMFindPluginsMenu(), item, PauseForMeMenuHandler, NULL);
+		XPLMAppendMenuItem(id, "Setup", (void *)"Setup", 1);
 
+		// Used by widget to make sure only one widgets instance created
+		MenuItem1 = 0;
+	}
+	catch (const std::exception& e) {
+		std::string error = e.what();
+		std::string msg = "XPluginStart --> ERROR --> " + error;
+		XPLMDebugString(msg.c_str());
+	}
+	catch (const std::string& e) {
+		std::string msg = "XPluginStart --> ERROR --> " + e;
+		XPLMDebugString(msg.c_str());
+	}
 	return 1;
 }
 
@@ -377,17 +395,20 @@ std::string formatNumber(float number, int decimal)
 // An opaque handle to the window we will create
 static XPLMWindowID	g_window;
 
-// Callbacks we will register when we create our window
-void				draw_hello_world(XPLMWindowID in_window_id, void * in_refcon);
-int					dummy_mouse_handler(XPLMWindowID in_window_id, int x, int y, int is_down, void * in_refcon) { return 0; }
-XPLMCursorStatus	dummy_cursor_status_handler(XPLMWindowID in_window_id, int x, int y, void * in_refcon) { return xplm_CursorDefault; }
-int					dummy_wheel_handler(XPLMWindowID in_window_id, int x, int y, int wheel, int clicks, void * in_refcon) { return 0; }
-void				dummy_key_handler(XPLMWindowID in_window_id, char key, XPLMKeyFlags flags, char virtual_key, void * in_refcon, int losing_focus) { }
 
 void CreateWidgetWindow()
 {
-	int x = 150;
-	int y = 900;
+
+	// Set the window's initial bounds
+	// Note that we're not guaranteed that the main monitor's lower left is at (0, 0)...
+	// We'll need to query for the global desktop bounds!
+	int left, bottom, right, top;
+	XPLMGetScreenBoundsGlobal(&left, &top, &right, &bottom);
+
+	//int x = 150;
+	//int y = 900;
+	int x = left + 100;
+	int y = top  - 100;
 	int w = 940;
 	int h = 490;
 
@@ -1000,7 +1021,7 @@ void CreateWidgetWindow()
 	topY -= 45;
 
 	// Button Save
-	tmpX = 390;
+	tmpX = 340;
 	leftX = x + tmpX;
 	bottomY = topY - heightFields - 5;
 	wBtnSave = XPCreateWidget(leftX, topY, leftX + 60, bottomY, 1, "Save", 0, wMainWindow, xpWidgetClass_Button);
@@ -1010,29 +1031,29 @@ void CreateWidgetWindow()
 	bottomY = topY - heightFields - 5;
 	wBtnCancel = XPCreateWidget(leftX, topY, leftX + 60, bottomY, 1, "Exit", 0, wMainWindow, xpWidgetClass_Button);
 	XPSetWidgetProperty(wBtnCancel, xpProperty_ButtonType, xpPushButton);
+	// Button Transmitter Switch
+	leftX = x + (tmpX + 190);
+	bottomY = topY - heightFields - 5;
+	wBtnStopStartWebSocket = XPCreateWidget(leftX, topY, leftX + 125, bottomY, 1, "Transmitter", 0, wMainWindow, xpWidgetClass_Button);
+	XPSetWidgetProperty(wBtnStopStartWebSocket, xpProperty_ButtonType, xpPushButton);
 
 	topY -= 30;
-	XPWidgetID email = XPCreateWidget(leftX + 273, topY, leftX + 283, topY - 5, 1, "ualter.junior@gmail.com", 0, wMainWindow, xpWidgetClass_Caption);
+	XPWidgetID email = XPCreateWidget(leftX + 233, topY, leftX + 283, topY - 5, 1, "ualter.junior@gmail.com", 0, wMainWindow, xpWidgetClass_Caption);
 	XPSetWidgetProperty(email, xpProperty_CaptionLit, 1);
-
 	
 	//*********************************************************************************************************************************
 	//*********************************************************************************************************************************
 	//*********************************************************************************************************************************
 	//*********************************************************************************************************************************
 	//*********************************************************************************************************************************
+	// Just For Debug Purposes
+
 	// Button Reload
 	leftX += 100;
 	bottomY = topY-heightFields;
 	wBtnReload = XPCreateWidget(leftX, topY-5, leftX+80, bottomY,1,"Reload",0,wMainWindow,xpWidgetClass_Button);
 	XPSetWidgetProperty(wBtnReload,xpProperty_ButtonType,xpPushButton);
-
-	leftX += 200;
-	bottomY = topY - heightFields;
-	wBtnStopWebSocket = XPCreateWidget(leftX, topY - 5, leftX + 80, bottomY, 1, "Stop WebSocket", 0, wMainWindow, xpWidgetClass_Button);
-	XPSetWidgetProperty(wBtnStopWebSocket, xpProperty_ButtonType, xpPushButton);
-
-	// Just For Debug Purposes
+	
 	topY -= 15;
 	bottomY = topY-heightFields;
 	leftX   = x+leftMargin;
@@ -1246,11 +1267,10 @@ int widgetWidgetHandler(XPWidgetMessage			inMessage,
 			XPLMReloadPlugins();
 			return 1;
 		}
-		if (inParam1 == (intptr_t)wBtnStopWebSocket)
+		if (inParam1 == (intptr_t)wBtnStopStartWebSocket)
 		{
-			socketServer->broadcast("Stopping...  bye!");
-			socketServer->stop();
-			threadTaskSocketServer.join();
+			switchSocketServer();
+			
 			return 1;
 		}
 	}
@@ -1974,6 +1994,30 @@ int checkDataRefs(int number) {
 	return result;
 }
 
+void showWindowPaused() {
+	int left, bottom, right, top;
+	XPLMGetScreenBoundsGlobal(&left, &top, &right, &bottom);
+
+	//int aX = 730, aY = 780;
+	int aX = left + 300;
+	int aY = top  - 300;
+	int aW = 420, aH = 150;
+
+	wAlertWindow = XPCreateWidget(aX, aY, aX + aW, aY - aH, 1, "Pause For Me!!!", 1, NULL, xpWidgetClass_SubWindow);
+	//XPSetWidgetProperty(wAlertWindow, xpProperty_MainWindowHasCloseBoxes, 1) (Erro quando ligado!!!);
+	XPWidgetID c0 = XPCreateWidget(aX + 20, aY, aX + aW + 20, aY - aH + 120, 1, "                *-*-*-*-*-*  Pause For Me!!!  *-*-*-*-*-*"
+		, 0, wAlertWindow, xpWidgetClass_Caption);
+	XPSetWidgetProperty(c0, xpProperty_CaptionLit, 1);
+	XPWidgetID c1 = XPCreateWidget(aX + 20, aY, aX + aW + 20, aY - aH + 25, 1, "Reason:", 0, wAlertWindow, xpWidgetClass_Caption);
+	XPSetWidgetProperty(c1, xpProperty_CaptionLit, 0);
+	XPWidgetID c2 = XPCreateWidget(aX + 20, aY, aX + aW + 20, aY - aH, 1, msgPause, 0, wAlertWindow, xpWidgetClass_Caption);
+	XPSetWidgetProperty(c2, xpProperty_CaptionLit, 0);
+	wBtnAlertWindowClose = XPCreateWidget(aX + 180, aY, aX + 260, aY - aH - 80, 1, "  Close  ", 0, wAlertWindow, xpWidgetClass_Button);
+	XPSetWidgetProperty(wBtnAlertWindowClose, xpProperty_ButtonType, xpPushButton);
+	XPAddWidgetCallback(wAlertWindow, widgetWidgetHandler);
+	AlertWindowShown = 1;
+}
+
 float CallBackXPlane(float  inElapsedSinceLastCall,
 	float  inElapsedTimeSinceLastFlightLoop,
 	int    inCounter,
@@ -1986,21 +2030,7 @@ float CallBackXPlane(float  inElapsedSinceLastCall,
 		if (!isGamePaused)
 		{
 			if (!AlertWindowShown) {
-				int aX = 730, aY = 780;
-				int aW = 420, aH = 150;
-				wAlertWindow = XPCreateWidget(aX, aY, aX + aW, aY - aH, 1, "Pause For Me!!!", 1, NULL, xpWidgetClass_SubWindow);
-				//XPSetWidgetProperty(wAlertWindow, xpProperty_MainWindowHasCloseBoxes, 1) (Erro quando ligado!!!);
-				XPWidgetID c0 = XPCreateWidget(aX + 20, aY, aX + aW + 20, aY - aH + 120, 1, "                *-*-*-*-*-*  Pause For Me!!!  *-*-*-*-*-*"
-					, 0, wAlertWindow, xpWidgetClass_Caption);
-				XPSetWidgetProperty(c0, xpProperty_CaptionLit, 1);
-				XPWidgetID c1 = XPCreateWidget(aX + 20, aY, aX + aW + 20, aY - aH + 25, 1, "Reason:", 0, wAlertWindow, xpWidgetClass_Caption);
-				XPSetWidgetProperty(c1, xpProperty_CaptionLit, 0);
-				XPWidgetID c2 = XPCreateWidget(aX + 20, aY, aX + aW + 20, aY - aH, 1, msgPause, 0, wAlertWindow, xpWidgetClass_Caption);
-				XPSetWidgetProperty(c2, xpProperty_CaptionLit, 0);
-				wBtnAlertWindowClose = XPCreateWidget(aX + 180, aY, aX + 260, aY - aH - 80, 1, "  Close  ", 0, wAlertWindow, xpWidgetClass_Button);
-				XPSetWidgetProperty(wBtnAlertWindowClose, xpProperty_ButtonType, xpPushButton);
-				XPAddWidgetCallback(wAlertWindow, widgetWidgetHandler);
-				AlertWindowShown = 1;
+				showWindowPaused();
 			}
 			XPLMCommandKeyStroke(xplm_key_pause);
 			if (wChkToUnSelect != NULL)
@@ -2008,82 +2038,73 @@ float CallBackXPlane(float  inElapsedSinceLastCall,
 		}
 	}
 	// NOW CHECK IF THE MOBILE APP HAS ASKED SOMETHING
-	std::string logMsg = "PauseForMe --> " + callBackHandler->getCommand();
-	XPLMDebugString(logMsg.c_str());
-	// PAUSE/UNPAUSE REQUESTED BY MOBILE APP
-	if (callBackHandler->getCommand().compare("{PAUSE}") == 0) {
-		XPLMCommandKeyStroke(xplm_key_pause);
-		callBackHandler->commandExecuted();
+	if (serverSocketStarted == 1) {
 
-		XPLMCreateWindow_t params;
-		params.structSize = sizeof(params);
-		params.visible = 1;
-		params.drawWindowFunc = draw_hello_world;
-		// Note on "dummy" handlers:
-		// Even if we don't want to handle these events, we have to register a "do-nothing" callback for them
-		params.handleMouseClickFunc = dummy_mouse_handler;
-		params.handleRightClickFunc = dummy_mouse_handler;
-		params.handleMouseWheelFunc = dummy_wheel_handler;
-		params.handleKeyFunc = dummy_key_handler;
-		params.handleCursorFunc = dummy_cursor_status_handler;
-		params.refcon = NULL;
-		params.layer = xplm_WindowLayerFloatingWindows;
-		// Opt-in to styling our window like an X-Plane 11 native window
-		// If you're on XPLM300, not XPLM301, swap this enum for the literal value 1.
-		params.decorateAsFloatingWindow = xplm_WindowDecorationRoundRectangle;
-		// Set the window's initial bounds
-		// Note that we're not guaranteed that the main monitor's lower left is at (0, 0)...
-		// We'll need to query for the global desktop bounds!
-		int left, bottom, right, top;
-		XPLMGetScreenBoundsGlobal(&left, &top, &right, &bottom);
-		params.left = left + 50;
-		params.bottom = bottom + 150;
-		params.right = params.left + 200;
-		params.top = params.bottom + 200;
-		g_window = XPLMCreateWindowEx(&params);
-		// Position the window as a "free" floating window, which the user can drag around
-		XPLMSetWindowPositioningMode(g_window, xplm_WindowPositionFree, -1);
-		// Limit resizing our window: maintain a minimum width/height of 100 boxels and a max width/height of 300 boxels
-		XPLMSetWindowResizingLimits(g_window, 200, 200, 300, 300);
-		XPLMSetWindowTitle(g_window, "Pause for Me");
+		if (!callBackHandler->getCommand().empty()) {
+			std::string logMsg = "PauseForMe --> " + callBackHandler->getCommand();
+			XPLMDebugString(logMsg.c_str());
+		}
+		
+		// PAUSE/UNPAUSE REQUESTED BY MOBILE APP
+		if (callBackHandler->getCommand().compare("{PAUSE}") == 0) {
+			XPLMCommandKeyStroke(xplm_key_pause);
+			callBackHandler->commandExecuted();
+			if (!AlertWindowShown) {
+				showWindowPaused();
+			}
+		}
 	}
-	
 
 	return CHECKINTERVAL;
 }
+
+int sentPausedMessageClients = 0;
 
 float CallBackXPlaneSocketServer(float  inElapsedSinceLastCall,
 	float  inElapsedTimeSinceLastFlightLoop,
 	int    inCounter,
 	void * inRefcon)
 {
-	double currentLatitude  = XPLMGetDatad(XPLMFindDataRef("sim/flightmodel/position/latitude"));
-	double currentLongitude = XPLMGetDatad(XPLMFindDataRef("sim/flightmodel/position/longitude"));
-	int    currentAltitude  = (int)XPLMGetDataf(XPLMFindDataRef("sim/cockpit2/gauges/indicators/altitude_ft_pilot"));
-	double gpsDMEDistM      = XPLMGetDatad(XPLMFindDataRef("sim/cockpit/radios/gps_dme_dist_m"));
-	double gpsDMETimeSecs   = XPLMGetDatad(XPLMFindDataRef("sim/cockpit/radios/gps_dme_time_secs"));
-	double airspeed         = XPLMGetDatad(XPLMFindDataRef("sim/cockpit2/gauges/indicators/airspeed_kts_pilot"));
-	double vsFpm            = XPLMGetDatad(XPLMFindDataRef("sim/cockpit2/gauges/indicators/vvi_fpm_pilot"));
-	double groundspeed      = XPLMGetDatad(XPLMFindDataRef("sim/flightmodel/position/groundspeed"));
+	if (serverSocketStarted == 1) {
+		int isGamePaused = XPLMGetDatai(XPLMFindDataRef("sim/time/paused"));
+		if (isGamePaused) {
+			if (!sentPausedMessageClients) {
+				sentPausedMessageClients = 1;
+				sendPausedMessageSocketClients();
+			}
+		}
+		else {
+			if (sentPausedMessageClients) {
+				sentPausedMessageClients = 0;
+				sendUnpausedMessageSocketClients();
+			}
+			double currentLatitude = XPLMGetDatad(XPLMFindDataRef("sim/flightmodel/position/latitude"));
+			double currentLongitude = XPLMGetDatad(XPLMFindDataRef("sim/flightmodel/position/longitude"));
+			int    currentAltitude = (int)XPLMGetDataf(XPLMFindDataRef("sim/cockpit2/gauges/indicators/altitude_ft_pilot"));
+			double gpsDMEDistM = XPLMGetDatad(XPLMFindDataRef("sim/cockpit/radios/gps_dme_dist_m"));
+			double gpsDMETimeSecs = XPLMGetDatad(XPLMFindDataRef("sim/cockpit/radios/gps_dme_time_secs"));
+			double airspeed = XPLMGetDatad(XPLMFindDataRef("sim/cockpit2/gauges/indicators/airspeed_kts_pilot"));
+			double vsFpm = XPLMGetDatad(XPLMFindDataRef("sim/cockpit2/gauges/indicators/vvi_fpm_pilot"));
+			double groundspeed = XPLMGetDatad(XPLMFindDataRef("sim/flightmodel/position/groundspeed"));
 
-	int    isGamePaused = XPLMGetDatai(XPLMFindDataRef("sim/time/paused"));
-
-	//REMOTE MOBILE APPLICATION FEEDING
-	std::ostringstream oss;
-	oss << "{";
-	oss << "   \"airplane\":";
-	oss << "   {";
-	oss << "     \"lat\":"             << currentLatitude;
-	oss << "    ,\"lng\":"             << currentLongitude;
-	oss << "    ,\"airspeed\":"        << airspeed;
-	oss << "    ,\"groundspeed\":"     << vsFpm;
-	oss << "    ,\"vsFpm\":"           << vsFpm;
-	oss << "    ,\"currentAltitude\":" << currentAltitude;
-	oss << "   }";
-	oss << "  ,\"isPaused\":" << std::to_string(isGamePaused);
-	oss << "  ,\"isBatteryOn\":" << std::to_string(isBatteryOn);
-	oss << "}";
-	socketServer->broadcast(oss.str());
+			//REMOTE MOBILE APPLICATION FEEDING
+			std::ostringstream oss;
+			oss << "{";
+			oss << "   \"airplane\":";
+			oss << "   {";
+			oss << "     \"lat\":" << currentLatitude;
+			oss << "    ,\"lng\":" << currentLongitude;
+			oss << "    ,\"airspeed\":" << airspeed;
+			oss << "    ,\"groundspeed\":" << vsFpm;
+			oss << "    ,\"vsFpm\":" << vsFpm;
+			oss << "    ,\"currentAltitude\":" << currentAltitude;
+			oss << "   }";
+			oss << "  ,\"isPaused\":" << std::to_string(isGamePaused);
+			oss << "  ,\"isBatteryOn\":" << std::to_string(isBatteryOn);
+			oss << "}";
+			socketServer->broadcast(oss.str());
+		}
+	}
 
 	return CHECKINTERVAL;
 }
@@ -2092,14 +2113,8 @@ float CallBackXPlaneSocketServer(float  inElapsedSinceLastCall,
 
 PLUGIN_API void	XPluginStop(void)
 {
-	log("Stop Socket Server!");
-	socketServer->broadcast("Stopping...  bye!");
-	socketServer->stop();
-	threadTaskSocketServer.join();
-	log("Stopped Socket Server!");
-
+	stopSocketServer();
 	XPLMUnregisterFlightLoopCallback(CallBackXPlane, NULL);
-	XPLMUnregisterFlightLoopCallback(CallBackXPlaneSocketServer, NULL);
 	XPLMUnregisterCommandHandler(SetupOnCommand, SetupOnCommandHandler, 0, 0);
 	XPLMUnregisterCommandHandler(SetupOffCommand, SetupOffCommandHandler, 0, 0);
 }
@@ -2367,24 +2382,57 @@ void log(std::string s) {
 	XPLMDebugString("\n");
 }
 
-void	draw_hello_world(XPLMWindowID in_window_id, void * in_refcon)
+void switchSocketServer() {
+	if (serverSocketStarted == 1) {
+		stopSocketServer();
+	}
+	else {
+		startSocketServer();
+	}
+}
+
+void sendStoppedMessageSocketClients()
 {
-	// Mandatory: We *must* set the OpenGL state before drawing
-	// (we can't make any assumptions about it)
-	XPLMSetGraphicsState(
-		0 /* no fog */,
-		0 /* 0 texture units */,
-		0 /* no lighting */,
-		0 /* no alpha testing */,
-		1 /* do alpha blend */,
-		1 /* do depth testing */,
-		0 /* no depth writing */
-	);
+	sendMessageSocketClients("STOPPED");
+}
+void sendStartedMessageSocketClients() {
+	sendMessageSocketClients("STARTED");
+}
+void sendPausedMessageSocketClients() {
+	sendMessageSocketClients("PAUSED");
+}
+void sendUnpausedMessageSocketClients() {
+	sendMessageSocketClients("PLAY");
+}
+void sendMessageSocketClients(std::string msg) {
+	std::ostringstream oss;
+	oss << "{";
+	oss << "   \"message\":\"" << msg.c_str() << "\"";
+	oss << "}";
+	socketServer->broadcast(oss.str());
+}
 
-	int l, t, r, b;
-	XPLMGetWindowGeometry(in_window_id, &l, &t, &r, &b);
+void stopSocketServer() {
+	if (serverSocketStarted == 1) {
+		XPLMUnregisterFlightLoopCallback(CallBackXPlaneSocketServer, NULL);
+		// Send Signal to Remote Clients, The WebServer Socket has stopped!
+		sendStoppedMessageSocketClients();
+		socketServer->stop();
+		threadTaskSocketServer.join();
+		serverSocketStarted = 0;
+		XPSetWidgetDescriptor(wBtnStopStartWebSocket, "Start Transmitter");
+	}
+}
 
-	float col_white[] = { 1.0, 1.0, 1.0 }; // red, green, blue
-
-	XPLMDrawString(col_white, l + 10, t - 20, "Paused by Movil!", NULL, xplmFont_Proportional);
+void startSocketServer() {
+	if (serverSocketStarted == 0){
+		socketServer = new SocketServer(9002);
+		callBackHandler = new CallBackHandler();
+		socketServer->setCallBack(callBackHandler);
+		serverSocketStarted = 1;
+		threadTaskSocketServer = std::thread(taskSocketServer, socketServer);
+		XPLMRegisterFlightLoopCallback(CallBackXPlaneSocketServer, 1.0, NULL);
+		XPSetWidgetDescriptor(wBtnStopStartWebSocket, "Stop Transmitter");
+		sendStartedMessageSocketClients();
+	}
 }

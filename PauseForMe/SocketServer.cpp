@@ -103,6 +103,7 @@ void SocketServer::stop() {
 	XPLMDebugString("SocketServer::stop() -->  STOPPING" );
 	XPLMDebugString(">>>");
 
+	
 	for (auto const& pair : this->connections) {
 		websocketpp::connection_hdl connection = pair.first;
 
@@ -122,6 +123,7 @@ void SocketServer::stop() {
 	XPLMDebugString(">>>");
 	XPLMDebugString("SocketServer::stop() -->  STOPPED!");
 	XPLMDebugString(">>>");
+	
 }
 
 
