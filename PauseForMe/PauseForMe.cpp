@@ -1049,19 +1049,19 @@ void CreateWidgetWindow()
 	// Just For Debug Purposes
 
 	// Button Reload
-	leftX += 100;
-	bottomY = topY-heightFields;
-	wBtnReload = XPCreateWidget(leftX, topY-5, leftX+80, bottomY,1,"Reload",0,wMainWindow,xpWidgetClass_Button);
-	XPSetWidgetProperty(wBtnReload,xpProperty_ButtonType,xpPushButton);
+	//leftX += 100;
+	//bottomY = topY-heightFields;
+	//wBtnReload = XPCreateWidget(leftX, topY-5, leftX+80, bottomY,1,"Reload",0,wMainWindow,xpWidgetClass_Button);
+	//XPSetWidgetProperty(wBtnReload,xpProperty_ButtonType,xpPushButton);
 	
-	topY -= 15;
-	bottomY = topY-heightFields;
-	leftX   = x+leftMargin;
-	widgetDebug1 = XPCreateWidget(leftX, topY, leftX+80, bottomY,1,"Debug1!",0,wMainWindow,xpWidgetClass_Caption);
-	leftX += 160;
-	widgetDebug2 = XPCreateWidget(leftX, topY, leftX+80, bottomY,1,"Debug2!",0,wMainWindow,xpWidgetClass_Caption);
-	leftX += 160;
-	widgetDebug3 = XPCreateWidget(leftX, topY, leftX+80, bottomY,1,"Debug3!",0,wMainWindow,xpWidgetClass_Caption);
+	//topY -= 15;
+	//bottomY = topY-heightFields;
+	//leftX   = x+leftMargin;
+	//widgetDebug1 = XPCreateWidget(leftX, topY, leftX+80, bottomY,1,"Debug1!",0,wMainWindow,xpWidgetClass_Caption);
+	//leftX += 160;
+	//widgetDebug2 = XPCreateWidget(leftX, topY, leftX+80, bottomY,1,"Debug2!",0,wMainWindow,xpWidgetClass_Caption);
+	//leftX += 160;
+	//widgetDebug3 = XPCreateWidget(leftX, topY, leftX+80, bottomY,1,"Debug3!",0,wMainWindow,xpWidgetClass_Caption);
 
 	XPAddWidgetCallback(wMainWindow, widgetWidgetHandler);
 }
@@ -1999,7 +1999,9 @@ void showWindowPaused() {
 	XPLMGetScreenBoundsGlobal(&left, &top, &right, &bottom);
 
 	//int aX = 730, aY = 780;
-	int aX = left + 300;
+	//int aX = left + 300;
+
+	int aX = ((right - left) - 420) / 2;
 	int aY = top  - 300;
 	int aW = 420, aH = 150;
 
@@ -2016,6 +2018,8 @@ void showWindowPaused() {
 	XPSetWidgetProperty(wBtnAlertWindowClose, xpProperty_ButtonType, xpPushButton);
 	XPAddWidgetCallback(wAlertWindow, widgetWidgetHandler);
 	AlertWindowShown = 1;
+
+	sprintf(msgPause, "%s", "");
 }
 
 float CallBackXPlane(float  inElapsedSinceLastCall,
@@ -2049,7 +2053,9 @@ float CallBackXPlane(float  inElapsedSinceLastCall,
 		if (callBackHandler->getCommand().compare("{PAUSE}") == 0) {
 			XPLMCommandKeyStroke(xplm_key_pause);
 			callBackHandler->commandExecuted();
+			std::string msg = "Mobile \"" + callBackHandler->getName() + "\" said to Pause!     [Origin: " + callBackHandler->getOrigin() + "]";
 			if (!AlertWindowShown) {
+				sprintf(msgPause, "%s",  msg.c_str());
 				showWindowPaused();
 			}
 		}

@@ -10,10 +10,14 @@ class CallBackHandler
 public:
 	CallBackHandler();
 	~CallBackHandler();
-	void acceptMessage(string message);
+	void acceptMessage(string origin, string message);
 	string getCommand();
+	string getOrigin();
+	string getName();
 	void commandExecuted();
 private:
 	string command;
+	string origin;
+	string name;
 	int executed;
 };

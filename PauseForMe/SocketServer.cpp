@@ -25,10 +25,13 @@ void SocketServer::broadcast(string message) {
 }
 
 void SocketServer::on_open(websocketpp::connection_hdl hdl) {
-	connection_data data;
+	server::connection_ptr con           = wsServer.get_con_from_hdl(hdl);
+	std::string            remoteAddress = con->get_socket().remote_endpoint().address().to_string();
+	std::string            remotePort    = std::to_string(con->get_socket().remote_endpoint().port());
 
+	connection_data data;
 	data.sessionid = this->sessionId++;
-	data.name = "Connection " + std::to_string(data.sessionid);
+	data.name      = remoteAddress + ":" + remotePort;
 
 	this->connections[hdl] = data;
 	this->arraySocketClients.push_back(hdl);
@@ -56,17 +59,22 @@ void SocketServer::setCallBack(CallBackHandler* callBackHandler)
 }
 
 void SocketServer::on_message(websocketpp::connection_hdl hdl, message_ptr msg) {
-	std::string message = msg->get_payload();
+	std::string      message        = msg->get_payload();
+	connection_data& dataConnection = get_data_from_hdl(hdl);
+
+	std::string      origin         = dataConnection.name;
+	//std::string      origin = "fjdksfsed";
+
+	std::string logMsg = "SocketServer::on_message() --> RECEIVED(origin, message) --> (" + origin + "," + message + ")";
+
+	this->callBackhandler->acceptMessage(origin,message);
 
 	// check for a special command to instruct the server to stop listening so
 	// it can be cleanly exited.
-	if (msg->get_payload() == "<<STOP>>") {
-		this->wsServer.stop_listening();
-		return;
-	}
-
-	std::string logMsg = "SocketServer::on_message() --> RECEIVED --> " + message;
-	this->callBackhandler->acceptMessage(message);
+	//if (msg->get_payload() == "<<STOP>>") {
+	//	this->wsServer.stop_listening();
+	//	return;
+	//}
 }
 
 void SocketServer::start() {
