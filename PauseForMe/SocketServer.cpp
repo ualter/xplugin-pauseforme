@@ -62,9 +62,7 @@ void SocketServer::on_message(websocketpp::connection_hdl hdl, message_ptr msg) 
 	std::string      message        = msg->get_payload();
 	connection_data& dataConnection = get_data_from_hdl(hdl);
 
-	std::string      origin         = dataConnection.name;
-	//std::string      origin = "fjdksfsed";
-
+	std::string origin = dataConnection.name;
 	std::string logMsg = "SocketServer::on_message() --> RECEIVED(origin, message) --> (" + origin + "," + message + ")";
 
 	this->callBackhandler->acceptMessage(origin,message);

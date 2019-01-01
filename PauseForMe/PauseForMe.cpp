@@ -231,6 +231,7 @@ static int AlertWindowShown;
 static int serverSocketStarted = 0;
 char debug_message[128];
 char msgPause[128];
+char msgPause2[128];
 std::string fileName = "PauseForMe.ini";
 
 Coordenada objCurrentLongitude(2), objCurrentLatitude(2), objUserLongitude(2), objUserLatitude(2);
@@ -250,6 +251,8 @@ float CallBackXPlaneSocketServer(float  inElapsedSinceLastCall,
 	int    inCounter,
 	void * inRefcon);
 static void PauseForMeMenuHandler(void *, void *);
+
+void hideWindowPaused();
 
 void checkPreferenceFile();
 
@@ -1034,7 +1037,7 @@ void CreateWidgetWindow()
 	// Button Transmitter Switch
 	leftX = x + (tmpX + 190);
 	bottomY = topY - heightFields - 5;
-	wBtnStopStartWebSocket = XPCreateWidget(leftX, topY, leftX + 125, bottomY, 1, "Transmitter", 0, wMainWindow, xpWidgetClass_Button);
+	wBtnStopStartWebSocket = XPCreateWidget(leftX, topY, leftX + 125, bottomY, 1, "Start Transmitter", 0, wMainWindow, xpWidgetClass_Button);
 	XPSetWidgetProperty(wBtnStopStartWebSocket, xpProperty_ButtonType, xpPushButton);
 
 	topY -= 30;
@@ -1251,8 +1254,7 @@ int widgetWidgetHandler(XPWidgetMessage			inMessage,
 		}
 		if (inParam1 == (intptr_t)wBtnAlertWindowClose)
 		{
-			XPHideWidget(wAlertWindow);
-			AlertWindowShown = 0;
+			hideWindowPaused();
 			XPLMCommandKeyStroke(xplm_key_pause);
 			resetDataRefsValues();
 		}
@@ -1994,6 +1996,15 @@ int checkDataRefs(int number) {
 	return result;
 }
 
+void hideWindowPaused() {
+	XPHideWidget(wAlertWindow);
+	AlertWindowShown = 0;
+	//sprintf(msgPause, "");
+	//sprintf(msgPause2, "");
+	msgPause[0] = '\0';
+	msgPause2[0] = '\0';
+}
+
 void showWindowPaused() {
 	int left, bottom, right, top;
 	XPLMGetScreenBoundsGlobal(&left, &top, &right, &bottom);
@@ -2001,25 +2012,35 @@ void showWindowPaused() {
 	//int aX = 730, aY = 780;
 	//int aX = left + 300;
 
-	int aX = ((right - left) - 420) / 2;
-	int aY = top  - 300;
-	int aW = 420, aH = 150;
+	
+	int aW = 600, aH = 280;
+	int aX = ((right - left) - 600) / 2;
+	//int aY = top  - 280;
+	int aY = ((bottom + top) + 280) / 2;
+
+	log(msgPause);
+	log(msgPause2);
 
 	wAlertWindow = XPCreateWidget(aX, aY, aX + aW, aY - aH, 1, "Pause For Me!!!", 1, NULL, xpWidgetClass_SubWindow);
 	//XPSetWidgetProperty(wAlertWindow, xpProperty_MainWindowHasCloseBoxes, 1) (Erro quando ligado!!!);
-	XPWidgetID c0 = XPCreateWidget(aX + 20, aY, aX + aW + 20, aY - aH + 120, 1, "                *-*-*-*-*-*  Pause For Me!!!  *-*-*-*-*-*"
-		, 0, wAlertWindow, xpWidgetClass_Caption);
+	XPWidgetID c0 = XPCreateWidget(aX + 20, aY, aX + aW + 20, aY - aH + 220, 1, "════════════════════════════ ►►► PAUSE FOR ME!!! ◄◄◄ ════════════════════════════", 0, wAlertWindow, xpWidgetClass_Caption);
 	XPSetWidgetProperty(c0, xpProperty_CaptionLit, 1);
-	XPWidgetID c1 = XPCreateWidget(aX + 20, aY, aX + aW + 20, aY - aH + 25, 1, "Reason:", 0, wAlertWindow, xpWidgetClass_Caption);
-	XPSetWidgetProperty(c1, xpProperty_CaptionLit, 0);
-	XPWidgetID c2 = XPCreateWidget(aX + 20, aY, aX + aW + 20, aY - aH, 1, msgPause, 0, wAlertWindow, xpWidgetClass_Caption);
+
+	XPWidgetID c1 = XPCreateWidget(aX + 20, aY, aX + aW + 20, aY - aH + 52, 1, "REASON ►►►", 0, wAlertWindow, xpWidgetClass_Caption);
+	XPSetWidgetProperty(c1, xpProperty_CaptionLit, 1);
+
+	XPWidgetID c2 = XPCreateWidget(aX + 20, aY, aX + aW + 20, aY - aH + 10, 1, msgPause, 0, wAlertWindow, xpWidgetClass_Caption);
 	XPSetWidgetProperty(c2, xpProperty_CaptionLit, 0);
-	wBtnAlertWindowClose = XPCreateWidget(aX + 180, aY, aX + 260, aY - aH - 80, 1, "  Close  ", 0, wAlertWindow, xpWidgetClass_Button);
+
+	XPWidgetID c3 = XPCreateWidget(aX + 20, aY, aX + aW + 20, aY - aH - 15, 1, msgPause2, 0, wAlertWindow, xpWidgetClass_Caption);
+	XPSetWidgetProperty(c3, xpProperty_CaptionLit, 0);
+
+	wBtnAlertWindowClose = XPCreateWidget(aX + 200, aY, aX + 400, aY - aH - 190, 1, "  ◄◄◄ UNPAUSE ►►►  ", 0, wAlertWindow, xpWidgetClass_Button);
 	XPSetWidgetProperty(wBtnAlertWindowClose, xpProperty_ButtonType, xpPushButton);
 	XPAddWidgetCallback(wAlertWindow, widgetWidgetHandler);
 	AlertWindowShown = 1;
 
-	sprintf(msgPause, "%s", "");
+	
 }
 
 float CallBackXPlane(float  inElapsedSinceLastCall,
@@ -2044,23 +2065,45 @@ float CallBackXPlane(float  inElapsedSinceLastCall,
 	// NOW CHECK IF THE MOBILE APP HAS ASKED SOMETHING
 	if (serverSocketStarted == 1) {
 
+		// Any Command to be executed?
 		if (!callBackHandler->getCommand().empty()) {
 			std::string logMsg = "PauseForMe --> " + callBackHandler->getCommand();
 			XPLMDebugString(logMsg.c_str());
-		}
-		
-		// PAUSE/UNPAUSE REQUESTED BY MOBILE APP
-		if (callBackHandler->getCommand().compare("{PAUSE}") == 0) {
-			XPLMCommandKeyStroke(xplm_key_pause);
-			callBackHandler->commandExecuted();
-			std::string msg = "Mobile \"" + callBackHandler->getName() + "\" said to Pause!     [Origin: " + callBackHandler->getOrigin() + "]";
-			if (!AlertWindowShown) {
-				sprintf(msgPause, "%s",  msg.c_str());
-				showWindowPaused();
+
+			// Check PAUSE/UNPAUSE REQUESTED BY MOBILE APP
+			if (callBackHandler->getCommand().rfind("{PAUSE}", 0) == 0) {
+
+				// Check by Who?  (Identification)
+				std::string identification = "Not Identified!";
+				std::size_t pos = callBackHandler->getCommand().find(",");
+				if (pos > 0) {
+					identification = callBackHandler->getCommand().substr(pos + 1);
+				}
+
+				// (Un)Pausing X-Plane
+				XPLMCommandKeyStroke(xplm_key_pause);
+				callBackHandler->commandExecuted();
+
+				// Check if the command Pause or Unpause the X-Plane
+				int isGamePaused = XPLMGetDatai(XPLMFindDataRef("sim/time/paused"));
+				if (isGamePaused) {
+					if (!AlertWindowShown) {
+						// Compose the Pause Message
+						std::string msg  = "Remote connection \"" + identification + "\" said to Pause!";
+						std::string msg2 = "[Origin: " + callBackHandler->getOrigin() + "]";
+						sprintf(msgPause, "%s", msg.c_str());
+						sprintf(msgPause2, "%s", msg2.c_str());
+						showWindowPaused();
+					}
+				}
+				else {
+					// In case of an unpause activity, hidden the window
+					hideWindowPaused();
+					AlertWindowShown = 0;
+				}
 			}
 		}
 	}
-
 	return CHECKINTERVAL;
 }
 

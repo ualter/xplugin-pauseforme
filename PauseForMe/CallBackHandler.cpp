@@ -19,7 +19,6 @@
 using namespace std;
 
 CallBackHandler::CallBackHandler() {
-	this->name = "Not Identified yet!";
 }
 
 CallBackHandler::~CallBackHandler() {
@@ -29,19 +28,9 @@ void CallBackHandler::acceptMessage(string origin, string message) {
 	std::string logMsg = "CallBackHandler::acceptMessage() from " + origin + " [Command Sent --> " + message + "]";
 	XPLMDebugString(logMsg.c_str());
 
-	if (message.find("{IDENTICATION}") != std::string::npos) {
-		std::size_t pos = message.find(",");
-		if (pos <= 0) {
-			this->name = message + " wasn't found the comma!";
-		}
-		else {
-			this->name = message.substr(pos+1);
-		}
-	} else {
-		this->origin   = origin;
-		this->command  = message;
-		this->executed = 0;
-	}
+	this->origin   = origin;
+	this->command  = message;
+	this->executed = 0;
 }
 
 string CallBackHandler::getCommand() {
@@ -50,10 +39,6 @@ string CallBackHandler::getCommand() {
 
 string CallBackHandler::getOrigin() {
 	return this->origin;
-}
-
-string CallBackHandler::getName() {
-	return this->name;
 }
 
 void CallBackHandler::commandExecuted() {
