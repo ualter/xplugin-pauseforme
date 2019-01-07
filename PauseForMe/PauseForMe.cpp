@@ -100,7 +100,7 @@
 #  define NULL ((void*)0)
 #endif
 
-#define CHECKINTERVAL 1.5 //seconds between checks
+#define CHECKINTERVAL 1 //seconds between checks
 
 static XPWidgetID wCaptionNav1, wCaptionNav2;
 static XPWidgetID wMainWindow, wSubWindow, wBtnSave, wBtnReload, wBtnCancel, wBtnStopStartWebSocket;
@@ -253,17 +253,14 @@ float CallBackXPlaneSocketServer(float  inElapsedSinceLastCall,
 static void PauseForMeMenuHandler(void *, void *);
 
 void hideWindowPaused();
-
 void checkPreferenceFile();
-
 void log(std::string s);
-
+void replaceAll(std::string &str, std::string replaceThis, std::string byThis, int compensate);
+void encodeForJson(std::string &str);
 void resetDataRefsValues();
-
 void switchSocketServer();
 void stopSocketServer();
 void startSocketServer();
-
 void sendStoppedMessageSocketClients();
 void sendStartedMessageSocketClients();
 void sendPausedMessageSocketClients();
@@ -1035,9 +1032,13 @@ void CreateWidgetWindow()
 	wBtnCancel = XPCreateWidget(leftX, topY, leftX + 60, bottomY, 1, "Exit", 0, wMainWindow, xpWidgetClass_Button);
 	XPSetWidgetProperty(wBtnCancel, xpProperty_ButtonType, xpPushButton);
 	// Button Transmitter Switch
+	std::string btnLabelTransmitter = "START Transmitter";
+	if ( serverSocketStarted ) {
+		btnLabelTransmitter = "STOP Transmitter";
+	}
 	leftX = x + (tmpX + 190);
 	bottomY = topY - heightFields - 5;
-	wBtnStopStartWebSocket = XPCreateWidget(leftX, topY, leftX + 125, bottomY, 1, "Start Transmitter", 0, wMainWindow, xpWidgetClass_Button);
+	wBtnStopStartWebSocket = XPCreateWidget(leftX, topY, leftX + 125, bottomY, 1, btnLabelTransmitter.c_str(), 0, wMainWindow, xpWidgetClass_Button);
 	XPSetWidgetProperty(wBtnStopStartWebSocket, xpProperty_ButtonType, xpPushButton);
 
 	topY -= 30;
@@ -2039,8 +2040,6 @@ void showWindowPaused() {
 	XPSetWidgetProperty(wBtnAlertWindowClose, xpProperty_ButtonType, xpPushButton);
 	XPAddWidgetCallback(wAlertWindow, widgetWidgetHandler);
 	AlertWindowShown = 1;
-
-	
 }
 
 float CallBackXPlane(float  inElapsedSinceLastCall,
@@ -2070,15 +2069,15 @@ float CallBackXPlane(float  inElapsedSinceLastCall,
 			std::string logMsg = "PauseForMe --> " + callBackHandler->getCommand();
 			XPLMDebugString(logMsg.c_str());
 
+			// Check by Who?  (Identification)
+			std::string identification = "Not Identified!";
+			std::size_t pos = callBackHandler->getCommand().find(",");
+			if (pos > 0) {
+				identification = callBackHandler->getCommand().substr(pos + 1);
+			}
+
 			// Check PAUSE/UNPAUSE REQUESTED BY MOBILE APP
 			if (callBackHandler->getCommand().rfind("{PAUSE}", 0) == 0) {
-
-				// Check by Who?  (Identification)
-				std::string identification = "Not Identified!";
-				std::size_t pos = callBackHandler->getCommand().find(",");
-				if (pos > 0) {
-					identification = callBackHandler->getCommand().substr(pos + 1);
-				}
 
 				// (Un)Pausing X-Plane
 				XPLMCommandKeyStroke(xplm_key_pause);
@@ -2101,13 +2100,17 @@ float CallBackXPlane(float  inElapsedSinceLastCall,
 					hideWindowPaused();
 					AlertWindowShown = 0;
 				}
+			} else 
+			if (callBackHandler->getCommand().rfind("{CLOSE}", 0) == 0) {
+				log("Received CLOSED request by " + identification);
+				callBackHandler->commandExecuted();
 			}
 		}
 	}
 	return CHECKINTERVAL;
 }
 
-int sentPausedMessageClients = 0;
+int pausedMessageSentToClients = 0;
 
 float CallBackXPlaneSocketServer(float  inElapsedSinceLastCall,
 	float  inElapsedTimeSinceLastFlightLoop,
@@ -2117,24 +2120,50 @@ float CallBackXPlaneSocketServer(float  inElapsedSinceLastCall,
 	if (serverSocketStarted == 1) {
 		int isGamePaused = XPLMGetDatai(XPLMFindDataRef("sim/time/paused"));
 		if (isGamePaused) {
-			if (!sentPausedMessageClients) {
-				sentPausedMessageClients = 1;
+			if (!pausedMessageSentToClients) {
+				pausedMessageSentToClients = 1;
 				sendPausedMessageSocketClients();
 			}
 		}
 		else {
-			if (sentPausedMessageClients) {
-				sentPausedMessageClients = 0;
+			if (pausedMessageSentToClients) {
+				pausedMessageSentToClients = 0;
 				sendUnpausedMessageSocketClients();
 			}
-			double currentLatitude = XPLMGetDatad(XPLMFindDataRef("sim/flightmodel/position/latitude"));
-			double currentLongitude = XPLMGetDatad(XPLMFindDataRef("sim/flightmodel/position/longitude"));
-			int    currentAltitude = (int)XPLMGetDataf(XPLMFindDataRef("sim/cockpit2/gauges/indicators/altitude_ft_pilot"));
-			double gpsDMEDistM = XPLMGetDatad(XPLMFindDataRef("sim/cockpit/radios/gps_dme_dist_m"));
-			double gpsDMETimeSecs = XPLMGetDatad(XPLMFindDataRef("sim/cockpit/radios/gps_dme_time_secs"));
-			double airspeed = XPLMGetDatad(XPLMFindDataRef("sim/cockpit2/gauges/indicators/airspeed_kts_pilot"));
-			double vsFpm = XPLMGetDatad(XPLMFindDataRef("sim/cockpit2/gauges/indicators/vvi_fpm_pilot"));
-			double groundspeed = XPLMGetDatad(XPLMFindDataRef("sim/flightmodel/position/groundspeed"));
+			double currentLatitude   = XPLMGetDatad(XPLMFindDataRef("sim/flightmodel/position/latitude"));
+			double currentLongitude  = XPLMGetDatad(XPLMFindDataRef("sim/flightmodel/position/longitude"));
+			int    currentAltitude   = (int)XPLMGetDataf(XPLMFindDataRef("sim/cockpit/pressure/cabin_altitude_actual_m_msl"));
+			int    currentAltitude2  = (int)XPLMGetDataf(XPLMFindDataRef("sim/cockpit2/gauges/indicators/altitude_ft_pilot"));
+			int    airspeed          = (int)XPLMGetDataf(XPLMFindDataRef("sim/cockpit2/gauges/indicators/airspeed_kts_pilot"));
+			int    trueAirspeed      = (int)XPLMGetDataf(XPLMFindDataRef("sim/cockpit2/gauges/indicators/true_airspeed_kts_pilot"));
+			int    vsFpm             = (int)XPLMGetDataf(XPLMFindDataRef("sim/cockpit2/gauges/indicators/vvi_fpm_pilot"));
+			int    groundspeed       = (int)XPLMGetDataf(XPLMFindDataRef("sim/cockpit2/gauges/indicators/ground_track_mag_pilot"));
+			int    heading           = (int)XPLMGetDataf(XPLMFindDataRef("sim/cockpit2/gauges/indicators/compass_heading_deg_mag"));
+
+			int    autoPilotHeading  = (int)XPLMGetDataf(XPLMFindDataRef("sim/cockpit/autopilot/heading"));
+			int    autoPilotAltitude = (int)XPLMGetDataf(XPLMFindDataRef("sim/cockpit/autopilot/altitude"));
+			int    autoPilotVsFpm    = (int)XPLMGetDataf(XPLMFindDataRef("sim/cockpit2/autopilot/vvi_dial_fpm"));
+			int    autoPilotVsStatus = XPLMGetDatai(XPLMFindDataRef("sim/cockpit2/autopilot/vvi_status"));
+			int    autoPilotAirspeed = (int)XPLMGetDataf(XPLMFindDataRef("sim/cockpit/autopilot/airspeed"));
+			int    autoPilotOnOff    = XPLMGetDatai(XPLMFindDataRef("sim/cockpit2/annunciators/autopilot"));
+
+			// GPS Destination
+			XPLMNavRef gpsDestination      = XPLMGetGPSDestination();
+			XPLMNavType gpsDestinationType = XPLMGetGPSDestinationType();
+
+			char label[256];
+			int  outFrequency;
+			char outID[10];
+			char outName[256];
+			XPLMGetNavAidInfo(gpsDestination, &gpsDestinationType, NULL, NULL, NULL, &outFrequency, NULL, outID, outName, NULL);
+			if (strcmp(outID, "----") != 0) {
+				std::string descripDestTypeGPS = getDescriptionGPSDestinationType(gpsDestinationType);
+				sprintf(label, "%s: %s  (%s)", descripDestTypeGPS.c_str(), outName, outID);
+			}
+			else {
+				std::string descripDestTypeGPS = "FMS";
+				sprintf(label, "%s", "FMS");
+			}
 
 			//REMOTE MOBILE APPLICATION FEEDING
 			std::ostringstream oss;
@@ -2144,9 +2173,30 @@ float CallBackXPlaneSocketServer(float  inElapsedSinceLastCall,
 			oss << "     \"lat\":" << currentLatitude;
 			oss << "    ,\"lng\":" << currentLongitude;
 			oss << "    ,\"airspeed\":" << airspeed;
-			oss << "    ,\"groundspeed\":" << vsFpm;
-			oss << "    ,\"vsFpm\":" << vsFpm;
+			oss << "    ,\"trueAirspeed\":" << trueAirspeed;
 			oss << "    ,\"currentAltitude\":" << currentAltitude;
+			oss << "    ,\"currentAltitude2\":" << currentAltitude2;
+			oss << "    ,\"vsFpm\":" << vsFpm;
+			oss << "    ,\"groundspeed\":" << groundspeed;
+			oss << "    ,\"currentFreqNav1\":" << currentFreqNav1;
+			oss << "    ,\"currentDistDmeNav1\":" << currentDistDmeNav1;
+			oss << "    ,\"currentTimeDmeNav1\":" << currentTimeDmeNav1;
+			oss << "    ,\"currentFreqNav2\":" << currentTimeDmeNav2;
+			oss << "    ,\"currentTimeDmeNav2\":" << currentTimeDmeNav2;
+			oss << "    ,\"currentDistDmeNav2\":" << currentTimeDmeNav2;
+			oss << "    ,\"currentGPSDistDme\":" << currentGPSDistDme;
+			oss << "    ,\"currentGPSTimeDme\":" << currentGPSTimeDme;
+			oss << "    ,\"destination\":\"" << label << "\"";
+			oss << "    ,\"heading\":" << heading;
+			oss << "    ,\"autopilot\":";
+			oss << "       {";
+			oss << "          \"on\":" << autoPilotOnOff;
+			oss << "         ,\"heading\":" << autoPilotHeading;
+			oss << "         ,\"altitude\":" << autoPilotAltitude;
+			oss << "         ,\"vsFpm\":" << autoPilotVsFpm;
+			oss << "         ,\"vsStatus\":" << autoPilotVsStatus;
+			oss << "         ,\"airspeed\":" << autoPilotAirspeed;
+			oss << "       }";
 			oss << "   }";
 			oss << "  ,\"isPaused\":" << std::to_string(isGamePaused);
 			oss << "  ,\"isBatteryOn\":" << std::to_string(isBatteryOn);
@@ -2431,6 +2481,24 @@ void log(std::string s) {
 	XPLMDebugString("\n");
 }
 
+void replaceAll(std::string &str, std::string replaceThis, std::string byThis, int compensate) {
+	size_t index = 0;
+	while (true) {
+		/* Locate the substring to replace. */
+		index = str.find(replaceThis, index);
+		if (index == std::string::npos) break;
+		/* Make the replacement. */
+		str.replace(index, byThis.length() + compensate, byThis);
+		/* Advance index forward so the next iteration doesn't pick it up as well. */
+		index += byThis.length() + compensate;
+	}
+}
+
+void encodeForJson(std::string &str) {
+	replaceAll(str, "\"", "|", 0);
+	replaceAll(str, "|", "\\\"", -1);
+}
+
 void switchSocketServer() {
 	if (serverSocketStarted == 1) {
 		stopSocketServer();
@@ -2448,7 +2516,20 @@ void sendStartedMessageSocketClients() {
 	sendMessageSocketClients("STARTED");
 }
 void sendPausedMessageSocketClients() {
-	sendMessageSocketClients("PAUSED");
+	std::string pauseMsg = "PAUSED";
+	if ( (msgPause != NULL) && (msgPause[0] != '\0') ) {
+		pauseMsg += ",";
+		std::string cleanedMsg = std::string(msgPause);
+		encodeForJson(cleanedMsg);
+		pauseMsg += cleanedMsg;
+		if ( (msgPause2 != NULL) && (msgPause2[0] != '\0') ) {
+			pauseMsg += ",";
+			std::string cleanedMsg = std::string(msgPause2);
+			encodeForJson(cleanedMsg);
+			pauseMsg += cleanedMsg;
+		}
+	}
+	sendMessageSocketClients(pauseMsg);
 }
 void sendUnpausedMessageSocketClients() {
 	sendMessageSocketClients("PLAY");
@@ -2469,7 +2550,7 @@ void stopSocketServer() {
 		socketServer->stop();
 		threadTaskSocketServer.join();
 		serverSocketStarted = 0;
-		XPSetWidgetDescriptor(wBtnStopStartWebSocket, "Start Transmitter");
+		XPSetWidgetDescriptor(wBtnStopStartWebSocket, "START Transmitter");
 	}
 }
 
@@ -2481,7 +2562,7 @@ void startSocketServer() {
 		serverSocketStarted = 1;
 		threadTaskSocketServer = std::thread(taskSocketServer, socketServer);
 		XPLMRegisterFlightLoopCallback(CallBackXPlaneSocketServer, 1.0, NULL);
-		XPSetWidgetDescriptor(wBtnStopStartWebSocket, "Stop Transmitter");
+		XPSetWidgetDescriptor(wBtnStopStartWebSocket, "STOP Transmitter");
 		sendStartedMessageSocketClients();
 	}
 }

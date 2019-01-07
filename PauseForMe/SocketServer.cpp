@@ -38,8 +38,6 @@ void SocketServer::on_open(websocketpp::connection_hdl hdl) {
 }
 
 void SocketServer::on_close(websocketpp::connection_hdl hdl) {
-	connection_data& data = get_data_from_hdl(hdl);
-
 	this->connections.erase(hdl);
 }
 
@@ -59,20 +57,31 @@ void SocketServer::setCallBack(CallBackHandler* callBackHandler)
 }
 
 void SocketServer::on_message(websocketpp::connection_hdl hdl, message_ptr msg) {
+	// Reading data of the connection
 	std::string      message        = msg->get_payload();
 	connection_data& dataConnection = get_data_from_hdl(hdl);
 
+	// Extracting information from connection 
 	std::string origin = dataConnection.name;
 	std::string logMsg = "SocketServer::on_message() --> RECEIVED(origin, message) --> (" + origin + "," + message + ")";
 
-	this->callBackhandler->acceptMessage(origin,message);
+	// Accept the message sent
+	this->callBackhandler->acceptMessage(origin, message);
 
-	// check for a special command to instruct the server to stop listening so
-	// it can be cleanly exited.
-	//if (msg->get_payload() == "<<STOP>>") {
-	//	this->wsServer.stop_listening();
-	//	return;
-	//}
+	// Check if the message is a request for close the connection and then do it
+	if ( message.rfind("{CLOSE}", 0) == 0 ) {
+		try {
+			XPLMDebugString( ("Requested CLOSE the Connection by Client " + origin).c_str());
+			this->connections.erase(hdl);
+			this->wsServer.pause_reading(hdl);
+			this->wsServer.close(hdl, websocketpp::close::status::going_away, "Requested by Client " + origin);
+		}
+		catch (websocketpp::exception const & e) {
+			std::string error = e.what();
+			std::string msg = "SocketServer::stop() --> ERROR --> " + error;
+			XPLMDebugString(msg.c_str());
+		}
+	}
 }
 
 void SocketServer::start() {
