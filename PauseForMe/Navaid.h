@@ -10,5 +10,8 @@ struct navaid
 	float latitude;
 	float longitude;
 	float distance;
+	float dmeDistance;
+	float dmeTime;
 	int statusOK;
 };
+

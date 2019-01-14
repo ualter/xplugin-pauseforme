@@ -46,7 +46,7 @@ navaid NavaidManager::getNearest()
 navaid NavaidManager::getLatitudeLongitude(float currentLatitude, float currentLongitude, const char * id, int typeNavaid)
 {
 	navaid navRetorno;
-	XPLMNavRef	refTeste = XPLMFindNavAid(NULL, "SBBE", NULL, NULL, NULL, xplm_Nav_Airport);
+	//XPLMNavRef	refTeste = XPLMFindNavAid(NULL, "SBBE", NULL, NULL, NULL, xplm_Nav_Airport);
 
 
 	/*XPLMNavRef	ref = XPLMFindNavAid(NULL, id, NULL, NULL, NULL, 
@@ -81,7 +81,7 @@ float NavaidManager::calculateDistanceBetweenNavaids(navaid navCurrent, navaid n
 	float cos2 = cosf(navOther.latitude*PI / 180);
 	float cos3 = cosf((navOther.longitude*PI / 180) - (navCurrent.longitude*PI / 180));
 
-	float distanceKm = acos((sin1 * sin2) + (cos1 * cos2  * cos3)) * 6371;
+	float distanceKm = acos((sin1 * sin2) + (cos1 * cos2  * cos3)) * EARTH_RADIO_KM;
 	float distanceNm = ceilf(distanceKm / 1.852f);
 
 	return distanceNm;

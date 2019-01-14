@@ -164,6 +164,27 @@ std::string dataRefValue2;
 std::string dataRef3;
 std::string dataRefValue3;
 
+NavaidManager navManager;
+navaid navaidGpsDestination;
+navaid navaidCurrentDestination;
+
+struct xpln_fms_entry {
+	float						type;
+	char						id[5];
+	float						altitude;
+	float						lat;
+	float						lon;
+};
+struct xpln_fms_entries {
+	char						packet_id[4];
+	int						    nb_of_entries;
+	int						    active_entry_index;
+	int						    destination_entry_index;
+	struct xpln_fms_entry		entries[99];
+};
+struct xpln_fms_entry		fms_entry;
+struct xpln_fms_entries		fms_entries;
+
 float userNavaidAirportDistance;
 std::string userNavaidAirportID;
 int isNavaidAirportSelected;
@@ -1442,7 +1463,6 @@ float roundLatLon(float d)
 navaid setInfoNavaid(int sizeCheck, XPWidgetID textId, XPWidgetID captionDistance, XPWidgetID captionDesc, 
 	float currentLatitude, float currentLongitude, int typeNavaid) {
 
-	NavaidManager navManager;
 	navaid navaidTarget;
 	navaid navCurrent;
 	navCurrent.latitude = currentLatitude;
@@ -1482,26 +1502,130 @@ void getXPlaneDataInfos()
 {
 	char label[256];
 
-	isBatteryOn = XPLMGetDatai(XPLMFindDataRef("sim/cockpit/electrical/battery_on"));
-	isGamePaused = XPLMGetDatai(XPLMFindDataRef("sim/time/paused"));
-	currentGPSDistDme = (int)XPLMGetDataf(XPLMFindDataRef("sim/cockpit/radios/gps_dme_dist_m"));
-	currentGPSTimeDme = (int)XPLMGetDataf(XPLMFindDataRef("sim/cockpit/radios/gps_dme_time_secs"));
+	// Current Latitude e Longitude
+	double currentLatitude = XPLMGetDatad(XPLMFindDataRef("sim/flightmodel/position/latitude"));
+	double currentLongitude = XPLMGetDatad(XPLMFindDataRef("sim/flightmodel/position/longitude"));
+	objCurrentLatitude.setValor(currentLatitude);
+	objCurrentLongitude.setValor(currentLongitude);
+	sprintf(label, "%s / %s", objCurrentLatitude.getValorStr().c_str(), objCurrentLongitude.getValorStr().c_str());
+	XPSetWidgetDescriptor(wCaptionLatLon, label);
+
+	// General Parameters
+	isBatteryOn       = XPLMGetDatai(XPLMFindDataRef("sim/cockpit/electrical/battery_on"));
+	isGamePaused      = XPLMGetDatai(XPLMFindDataRef("sim/time/paused"));
 
 	// GPS Destination
-	XPLMNavRef gpsDestination = XPLMGetGPSDestination();
+	currentGPSDistDme              = (int)XPLMGetDataf(XPLMFindDataRef("sim/cockpit/radios/gps_dme_dist_m"));
+	currentGPSTimeDme              = (int)XPLMGetDataf(XPLMFindDataRef("sim/cockpit/radios/gps_dme_time_secs"));
+	XPLMNavRef  gpsDestination     = XPLMGetGPSDestination();
 	XPLMNavType gpsDestinationType = XPLMGetGPSDestinationType();
-
-	int outFrequency;
-	char outID[10];
-	char outName[256];
-	XPLMGetNavAidInfo(gpsDestination, &gpsDestinationType, NULL, NULL, NULL, &outFrequency, NULL, outID, outName, NULL);
+	int   outFrequency;
+	char  outID[10];
+	char  outName[256];
+	float outLatitude;
+	float outLongitude;
+	float outHeading;
+	XPLMGetNavAidInfo(gpsDestination, &gpsDestinationType, &outLatitude, &outLongitude, NULL, &outFrequency, &outHeading, outID, outName, NULL);
 	if (strcmp(outID, "----") != 0)  {
 		std::string descripDestTypeGPS = getDescriptionGPSDestinationType(gpsDestinationType);
 		sprintf(label, "%s: %s  (%s)", descripDestTypeGPS.c_str(), outName, outID);
+
+		// Check and fill info regading NavAid GPS destination (distance, name, location, etc.)
+		navaidGpsDestination.id            = std::string(outID);
+		navaidGpsDestination.name          = std::string(outName);
+		navaidGpsDestination.latitude      = outLatitude;
+		navaidGpsDestination.longitude     = outLongitude;
+		navaidCurrentDestination.latitude  = currentLatitude;
+		navaidCurrentDestination.longitude = currentLongitude;
+		navaidGpsDestination.dmeDistance   = currentGPSDistDme;
+		navaidGpsDestination.dmeTime       = currentGPSTimeDme;
+		float distanceNavs                 = navManager.calculateDistanceBetweenNavaids(navaidCurrentDestination, navaidGpsDestination);
+		navaidGpsDestination.distance      = distanceNavs;
+		navaidGpsDestination.statusOK      = 1;
 	} else {
+		navaidGpsDestination.statusOK  = 0;
 		std::string descripDestTypeGPS = "FMS";
 		sprintf(label, "%s", "FMS");
 	}
+
+	
+	// FMS Destination
+
+	int nb_of_fms_entries               = XPLMCountFMSEntries();
+	fms_entries.active_entry_index      = XPLMGetDisplayedFMSEntry();
+	fms_entries.destination_entry_index = XPLMGetDestinationFMSEntry();
+	strncpy(fms_entries.packet_id, "FMSE", 4);
+
+	log("FMS --> nb_of_entries:" + std::to_string(fms_entries.nb_of_entries)
+		+ ", active_entry_index=" + std::to_string(fms_entries.active_entry_index)
+		+ ", destination_entry_index=" + std::to_string(fms_entries.destination_entry_index)
+	);
+
+	XPLMNavType type;
+	XPLMNavRef outRef;
+
+	char id[80];
+	int altitude;
+	float lat;
+	float lon;
+	int toc_tod_flag = 0;
+
+	for (int i = 0; i < nb_of_fms_entries; i++) {
+		XPLMGetFMSEntryInfo(
+							i,
+							&type,
+							id,
+							&outRef,
+							&altitude,
+							&lat,
+							&lon);
+
+		fms_entries.entries[i].type = htonf((float)type);
+		fms_entries.entries[i].altitude = htonf((float)altitude);
+
+		if (fms_entries.entries[i].type == 2048) {
+			if (toc_tod_flag == 0) {
+				strncpy(fms_entries.entries[i].id, "T/C", sizeof(fms_entries.entries[i].id));
+				toc_tod_flag = 1;
+			}
+			else {
+				strncpy(fms_entries.entries[i].id, "T/D", sizeof(fms_entries.entries[i].id));
+			}
+		}
+		else {
+			strncpy(fms_entries.entries[i].id, id, sizeof(fms_entries.entries[i].id));
+		}
+		fms_entries.entries[i].lat = htonf(lat);
+		fms_entries.entries[i].lon = htonf(lon);
+
+		log("FMS --> entry: " + std::to_string(i) + " = " + std::string(fms_entries.entries[i].id));
+
+	}
+
+	/*int entryFmsDestination;
+	entryFmsDestination = XPLMGetDestinationFMSEntry();
+	XPLMNavType fmsNavType;
+	XPLMNavRef fmsNavRef;
+	int fmsAltitude;
+	float fmsLatitude;
+	float fmsLongitude;
+	outID[0]   = '\0';
+	outName[0] = '\0';
+	XPLMGetFMSEntryInfo(entryFmsDestination, &fmsNavType, outID, &fmsNavRef, &fmsAltitude, &fmsLatitude, &fmsLongitude);
+	
+	XPLMGetNavAidInfo(fmsNavRef, NULL, NULL, NULL, NULL, NULL, NULL, outID, outName, NULL);
+	
+	log("FMS --> entry:" + std::to_string(entryFmsDestination)
+		+ ", " + std::to_string(fmsLatitude)
+		+ ", " + std::to_string(fmsLongitude)
+		+ ", " + std::string(outID)
+		+ ", " + std::string(outName)
+	);
+	*/
+
+	
+	
+
 	XPSetWidgetDescriptor(wCaptionGPS, label);
 	sprintf(label, "%dnm", currentGPSDistDme);
 	XPSetWidgetDescriptor(wCaptionGPSDmeDistance, label);
@@ -1564,13 +1688,7 @@ void getXPlaneDataInfos()
 	XPSetWidgetDescriptor(wCaptionTimeDmeNav2, label);
 	XPSetWidgetDescriptor(wHSIAlignmentNav2, formatNumber(currentHsiAlignmentNav2, 2).c_str());
 
-	// Latitude e Longitude
-	double currentLatitude = XPLMGetDatad(XPLMFindDataRef("sim/flightmodel/position/latitude"));
-	double currentLongitude = XPLMGetDatad(XPLMFindDataRef("sim/flightmodel/position/longitude"));
-	objCurrentLatitude.setValor(currentLatitude);
-	objCurrentLongitude.setValor(currentLongitude);
-	sprintf(label, "%s / %s", objCurrentLatitude.getValorStr().c_str(), objCurrentLongitude.getValorStr().c_str());
-	XPSetWidgetDescriptor(wCaptionLatLon, label);
+	
 
 	// Feed Info About Navaids
 	navaidAirport = setInfoNavaid(4,wTextNavaidAirportID, wCaptionNavaidAirportDistance, wCaptionNavaidAirportDesc,
@@ -2066,8 +2184,6 @@ float CallBackXPlane(float  inElapsedSinceLastCall,
 
 		// Any Command to be executed?
 		if (!callBackHandler->getCommand().empty()) {
-			std::string logMsg = "PauseForMe --> " + callBackHandler->getCommand();
-			XPLMDebugString(logMsg.c_str());
 
 			// Check by Who?  (Identification)
 			std::string identification = "Not Identified!";
@@ -2196,6 +2312,17 @@ float CallBackXPlaneSocketServer(float  inElapsedSinceLastCall,
 			oss << "         ,\"vsFpm\":" << autoPilotVsFpm;
 			oss << "         ,\"vsStatus\":" << autoPilotVsStatus;
 			oss << "         ,\"airspeed\":" << autoPilotAirspeed;
+			oss << "       }";
+			oss << "    ,\"pauseforme\":";
+			oss << "       {";
+			oss << "         \"navaid\":";
+			oss << "           {";
+			oss << "              \"userAirportDistance\":" << userNavaidAirportDistance;
+			oss << "             ,\"userVORDistance\":" << userNavaidVORDistance;
+			oss << "             ,\"userNDBDistance\":" << userNavaidNDBDistance;
+			oss << "             ,\"userFixDistance\":" << userNavaidFixDistance;
+			oss << "             ,\"userDMEDistance\":" << userNavaidDMEDistance;
+			oss << "           }";
 			oss << "       }";
 			oss << "   }";
 			oss << "  ,\"isPaused\":" << std::to_string(isGamePaused);
