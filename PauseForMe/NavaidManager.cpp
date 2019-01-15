@@ -2,9 +2,15 @@
 #define APL 0
 #define IBM 1
 
+#pragma warning(disable: 4996)
+#pragma warning(disable: 4244)
+#pragma warning(disable: 4267)
+
+
 #include "NavaidManager.h"
 #include "XPLMNavigation.h"
 #include "XPLMDataAccess.h"
+#include "XPLMUtilities.h"
 #include <sstream>
 #include "Navaid.h"
 #include <math.h>
@@ -85,5 +91,37 @@ float NavaidManager::calculateDistanceBetweenNavaids(navaid navCurrent, navaid n
 	float distanceNm = ceilf(distanceKm / 1.852f);
 
 	return distanceNm;
+}
+
+void NavaidManager::calculateTime(int time[3], int speed, int distance) {
+	if (speed > 9) {
+		// convert nautical miles to km
+		speed = speed * 1.852;
+
+		int   hourI = distance / speed;
+		float hourF = ((float)distance / speed) - hourI;
+		int   minuI = hourF * 60;
+		float minuF = (hourF * 60) - minuI;
+		int   secoI = minuF * 60;
+		float secoF = (minuF * 60) - secoI;
+		int   milim = secoF * 1000;
+
+		time[0] = hourI;
+		time[1] = minuI;
+		time[2] = secoI;
+	}
+	else {
+		time[0] = 99;
+		time[1] = 99;
+		time[2] = 99;
+	}
+}
+void NavaidManager::calculateTimeFormatted(char* output, int speed, int distance) {
+
+	int arrayTime[3];
+	calculateTime(arrayTime, speed, distance);
+	char buffer[10];
+	sprintf(buffer, "%02d:%02d:%02d", arrayTime[0], arrayTime[1], arrayTime[2]);
+	strncpy(output, buffer, 10);
 }
 

@@ -166,6 +166,7 @@ std::string dataRefValue3;
 
 NavaidManager navManager;
 navaid navaidGpsDestination;
+navaid navaidFmsDestination;
 navaid navaidCurrentDestination;
 
 struct xpln_fms_entry {
@@ -1509,14 +1510,27 @@ void getXPlaneDataInfos()
 	objCurrentLongitude.setValor(currentLongitude);
 	sprintf(label, "%s / %s", objCurrentLatitude.getValorStr().c_str(), objCurrentLongitude.getValorStr().c_str());
 	XPSetWidgetDescriptor(wCaptionLatLon, label);
+	navaidCurrentDestination.latitude  = currentLatitude;
+	navaidCurrentDestination.longitude = currentLongitude;
 
 	// General Parameters
 	isBatteryOn       = XPLMGetDatai(XPLMFindDataRef("sim/cockpit/electrical/battery_on"));
 	isGamePaused      = XPLMGetDatai(XPLMFindDataRef("sim/time/paused"));
 
+	// Altitude and Airspeed
+	currentAltitude = (int)XPLMGetDataf(XPLMFindDataRef("sim/cockpit2/gauges/indicators/altitude_ft_pilot"));
+	currentAirspeed = (int)XPLMGetDataf(XPLMFindDataRef("sim/cockpit2/gauges/indicators/airspeed_kts_pilot"));
+	sprintf(label, "%dft", (int)currentAltitude);
+	XPSetWidgetDescriptor(wCaptionAltitude, label);
+	sprintf(label, "%dkts", (int)currentAirspeed);
+	XPSetWidgetDescriptor(wCaptionAirspeed, label);
+
 	// GPS Destination
 	currentGPSDistDme              = (int)XPLMGetDataf(XPLMFindDataRef("sim/cockpit/radios/gps_dme_dist_m"));
 	currentGPSTimeDme              = (int)XPLMGetDataf(XPLMFindDataRef("sim/cockpit/radios/gps_dme_time_secs"));
+	if (currentGPSTimeDme < 0) {
+		currentGPSTimeDme = 0;
+	}
 	XPLMNavRef  gpsDestination     = XPLMGetGPSDestination();
 	XPLMNavType gpsDestinationType = XPLMGetGPSDestinationType();
 	int   outFrequency;
@@ -1529,115 +1543,81 @@ void getXPlaneDataInfos()
 	if (strcmp(outID, "----") != 0)  {
 		std::string descripDestTypeGPS = getDescriptionGPSDestinationType(gpsDestinationType);
 		sprintf(label, "%s: %s  (%s)", descripDestTypeGPS.c_str(), outName, outID);
-
-		// Check and fill info regading NavAid GPS destination (distance, name, location, etc.)
-		navaidGpsDestination.id            = std::string(outID);
-		navaidGpsDestination.name          = std::string(outName);
-		navaidGpsDestination.latitude      = outLatitude;
-		navaidGpsDestination.longitude     = outLongitude;
-		navaidCurrentDestination.latitude  = currentLatitude;
-		navaidCurrentDestination.longitude = currentLongitude;
-		navaidGpsDestination.dmeDistance   = currentGPSDistDme;
-		navaidGpsDestination.dmeTime       = currentGPSTimeDme;
-		float distanceNavs                 = navManager.calculateDistanceBetweenNavaids(navaidCurrentDestination, navaidGpsDestination);
-		navaidGpsDestination.distance      = distanceNavs;
-		navaidGpsDestination.statusOK      = 1;
+		navaidGpsDestination.id              = std::string(outID);
+		navaidGpsDestination.name            = std::string(outName);
+		navaidGpsDestination.latitude        = outLatitude;
+		navaidGpsDestination.longitude       = outLongitude;
+		navaidGpsDestination.dmeDistance     = currentGPSDistDme;
+		navaidGpsDestination.dmeTime         = currentGPSTimeDme;
+		float distanceNavs = navManager.calculateDistanceBetweenNavaids(navaidCurrentDestination, navaidGpsDestination);
+		navaidGpsDestination.distance        = distanceNavs;
+		navaidGpsDestination.typeDescription = descripDestTypeGPS;
+		navaidGpsDestination.statusOK        = 1;
 	} else {
+		navaidGpsDestination.id        = "----";
+		navaidGpsDestination.name      = "None";
 		navaidGpsDestination.statusOK  = 0;
-		std::string descripDestTypeGPS = "FMS";
-		sprintf(label, "%s", "FMS");
+		std::string descripDestTypeGPS = "";
+		sprintf(label, "%s", "");
 	}
 
-	
 	// FMS Destination
+	int entryFmsNextDestination;
+	if ( XPLMCountFMSEntries() > 2 ) {
+		entryFmsNextDestination = XPLMGetDestinationFMSEntry();
+		XPLMNavType fmsNavType;
+		XPLMNavRef fmsNavRef;
+		int fmsAltitude;
+		float fmsLatitude;
+		float fmsLongitude;
+		char fmsOutID[10];
+		char fmsOutName[256];
+		XPLMGetFMSEntryInfo(entryFmsNextDestination, &fmsNavType, fmsOutID, &fmsNavRef, &fmsAltitude, &fmsLatitude, &fmsLongitude);
+		XPLMGetNavAidInfo(fmsNavRef, NULL, NULL, NULL, NULL, NULL, NULL, fmsOutID, fmsOutName, NULL);
+		navaidFmsDestination.id              = std::string(fmsOutID);
+		navaidFmsDestination.name            = std::string(fmsOutName);
+		navaidFmsDestination.latitude        = fmsLatitude;
+		navaidFmsDestination.longitude       = fmsLongitude;
+		navaidFmsDestination.dmeDistance     = -1;
+		navaidFmsDestination.dmeTime         = -1;
+		float distanceNavs                   = navManager.calculateDistanceBetweenNavaids(navaidCurrentDestination, navaidFmsDestination);
+		navaidFmsDestination.distance        = distanceNavs;
+		char timeFms[10];
+		navManager.calculateTimeFormatted(timeFms, currentAirspeed, (int)distanceNavs);
+		navaidFmsDestination.fmsTime         = std::string(timeFms);
+		navaidFmsDestination.statusOK        = 1;
+		navaidFmsDestination.typeDescription = getDescriptionGPSDestinationType(fmsNavType);
+	} else {
+		navaidFmsDestination.id          = "---";
+		navaidFmsDestination.name        = "None";
+		navaidFmsDestination.statusOK    = 0;
+	}
 
-	int nb_of_fms_entries               = XPLMCountFMSEntries();
-	fms_entries.active_entry_index      = XPLMGetDisplayedFMSEntry();
-	fms_entries.destination_entry_index = XPLMGetDestinationFMSEntry();
-	strncpy(fms_entries.packet_id, "FMSE", 4);
-
-	log("FMS --> nb_of_entries:" + std::to_string(fms_entries.nb_of_entries)
-		+ ", active_entry_index=" + std::to_string(fms_entries.active_entry_index)
-		+ ", destination_entry_index=" + std::to_string(fms_entries.destination_entry_index)
+	/*
+	log("GPS --> descripDestTypeGPS:" + navaidGpsDestination.typeDescription
+		+ ", latitude=" + std::to_string(navaidGpsDestination.latitude)
+		+ ", longitude=" + std::to_string(navaidGpsDestination.longitude)
+		+ ", of " + std::string(navaidGpsDestination.id)
+		+ "-" + std::string(navaidGpsDestination.name)
+		+ ", distance=" + std::to_string(navaidGpsDestination.distance)
+		+ ", time=" + std::to_string(navaidGpsDestination.dmeTime)
 	);
 
-	XPLMNavType type;
-	XPLMNavRef outRef;
-
-	char id[80];
-	int altitude;
-	float lat;
-	float lon;
-	int toc_tod_flag = 0;
-
-	for (int i = 0; i < nb_of_fms_entries; i++) {
-		XPLMGetFMSEntryInfo(
-							i,
-							&type,
-							id,
-							&outRef,
-							&altitude,
-							&lat,
-							&lon);
-
-		fms_entries.entries[i].type = htonf((float)type);
-		fms_entries.entries[i].altitude = htonf((float)altitude);
-
-		if (fms_entries.entries[i].type == 2048) {
-			if (toc_tod_flag == 0) {
-				strncpy(fms_entries.entries[i].id, "T/C", sizeof(fms_entries.entries[i].id));
-				toc_tod_flag = 1;
-			}
-			else {
-				strncpy(fms_entries.entries[i].id, "T/D", sizeof(fms_entries.entries[i].id));
-			}
-		}
-		else {
-			strncpy(fms_entries.entries[i].id, id, sizeof(fms_entries.entries[i].id));
-		}
-		fms_entries.entries[i].lat = htonf(lat);
-		fms_entries.entries[i].lon = htonf(lon);
-
-		log("FMS --> entry: " + std::to_string(i) + " = " + std::string(fms_entries.entries[i].id));
-
-	}
-
-	/*int entryFmsDestination;
-	entryFmsDestination = XPLMGetDestinationFMSEntry();
-	XPLMNavType fmsNavType;
-	XPLMNavRef fmsNavRef;
-	int fmsAltitude;
-	float fmsLatitude;
-	float fmsLongitude;
-	outID[0]   = '\0';
-	outName[0] = '\0';
-	XPLMGetFMSEntryInfo(entryFmsDestination, &fmsNavType, outID, &fmsNavRef, &fmsAltitude, &fmsLatitude, &fmsLongitude);
-	
-	XPLMGetNavAidInfo(fmsNavRef, NULL, NULL, NULL, NULL, NULL, NULL, outID, outName, NULL);
-	
-	log("FMS --> entry:" + std::to_string(entryFmsDestination)
-		+ ", " + std::to_string(fmsLatitude)
-		+ ", " + std::to_string(fmsLongitude)
-		+ ", " + std::string(outID)
-		+ ", " + std::string(outName)
+	log("FMS --> entryFmsNextDestination:" + std::to_string(entryFmsNextDestination)
+		+ ", latitude=" + std::to_string(navaidFmsDestination.latitude)
+		+ ", longitude=" + std::to_string(navaidFmsDestination.longitude)
+		+ ", of " + std::string(navaidFmsDestination.id)
+		+ "-" + std::string(navaidFmsDestination.name)
+		+ ", distance=" + std::to_string(navaidFmsDestination.distance)
+		+ ", time=" + navaidFmsDestination.fmsTime
 	);
 	*/
-
-	
-	
 
 	XPSetWidgetDescriptor(wCaptionGPS, label);
 	sprintf(label, "%dnm", currentGPSDistDme);
 	XPSetWidgetDescriptor(wCaptionGPSDmeDistance, label);
 	sprintf(label, "%dmin", currentGPSTimeDme);
 	XPSetWidgetDescriptor(wCaptionGPSDmeTime, label);
-
-	currentAltitude = (int)XPLMGetDataf(XPLMFindDataRef("sim/cockpit2/gauges/indicators/altitude_ft_pilot"));
-	currentAirspeed = (int)XPLMGetDataf(XPLMFindDataRef("sim/cockpit2/gauges/indicators/airspeed_kts_pilot"));
-	sprintf(label, "%dft", (int)currentAltitude);
-	XPSetWidgetDescriptor(wCaptionAltitude, label);
-	sprintf(label, "%dkts", (int)currentAirspeed);
-	XPSetWidgetDescriptor(wCaptionAirspeed, label);
 
 	currentFreqNav1 = XPLMGetDatai(XPLMFindDataRef("sim/cockpit/radios/nav1_freq_hz"));
 	currentDistDmeNav1 = XPLMGetDataf(XPLMFindDataRef("sim/cockpit2/radios/indicators/nav1_dme_distance_nm"));
@@ -2322,6 +2302,32 @@ float CallBackXPlaneSocketServer(float  inElapsedSinceLastCall,
 			oss << "             ,\"userNDBDistance\":" << userNavaidNDBDistance;
 			oss << "             ,\"userFixDistance\":" << userNavaidFixDistance;
 			oss << "             ,\"userDMEDistance\":" << userNavaidDMEDistance;
+			oss << "           }";
+			oss << "       }";
+			oss << "    ,\"nextDestination\":";
+			oss << "       {";
+			oss << "         \"gps\":";
+			oss << "           {";
+			oss << "              \"id\":\"" << navaidGpsDestination.id << "\"";
+			oss << "             ,\"name\":\"" << navaidGpsDestination.name << "\"";
+			oss << "             ,\"latitude\":" << navaidGpsDestination.latitude;
+			oss << "             ,\"longitude\":" << navaidGpsDestination.longitude;
+			oss << "             ,\"dmeDistance\":" << navaidGpsDestination.dmeDistance;
+			oss << "             ,\"dmeTime\":" << navaidGpsDestination.dmeTime;
+			oss << "             ,\"distance\":" << navaidGpsDestination.distance;
+			oss << "             ,\"type\":\"" << navaidGpsDestination.typeDescription << "\"";
+			oss << "             ,\"status\":" << navaidGpsDestination.statusOK;
+			oss << "           }";
+			oss << "         ,\"fms\":";
+			oss << "           {";
+			oss << "              \"id\":\"" << navaidFmsDestination.id << "\"";
+			oss << "             ,\"name\":\"" << navaidFmsDestination.name << "\"";
+			oss << "             ,\"latitude\":" << navaidFmsDestination.latitude;
+			oss << "             ,\"longitude\":" << navaidFmsDestination.longitude;
+			oss << "             ,\"fmsTime\":\"" << navaidFmsDestination.fmsTime << "\"";
+			oss << "             ,\"distance\":" << navaidFmsDestination.distance;
+			oss << "             ,\"type\":\"" << navaidFmsDestination.typeDescription << "\"";
+			oss << "             ,\"status\":" << navaidFmsDestination.statusOK;
 			oss << "           }";
 			oss << "       }";
 			oss << "   }";
