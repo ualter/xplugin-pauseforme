@@ -2233,8 +2233,12 @@ float CallBackXPlaneSocketServer(float  inElapsedSinceLastCall,
 			int    airspeed          = (int)XPLMGetDataf(XPLMFindDataRef("sim/cockpit2/gauges/indicators/airspeed_kts_pilot"));
 			int    trueAirspeed      = (int)XPLMGetDataf(XPLMFindDataRef("sim/cockpit2/gauges/indicators/true_airspeed_kts_pilot"));
 			int    vsFpm             = (int)XPLMGetDataf(XPLMFindDataRef("sim/cockpit2/gauges/indicators/vvi_fpm_pilot"));
-			int    groundspeed       = (int)XPLMGetDataf(XPLMFindDataRef("sim/cockpit2/gauges/indicators/ground_track_mag_pilot"));
-			int    heading           = (int)XPLMGetDataf(XPLMFindDataRef("sim/cockpit2/gauges/indicators/compass_heading_deg_mag"));
+			int    groundspeed       = (int)XPLMGetDataf(XPLMFindDataRef("sim/flightmodel/position/groundspeed"));   // meters per second
+			int    headingDegMag     = (int)XPLMGetDataf(XPLMFindDataRef("sim/cockpit2/gauges/indicators/compass_heading_deg_mag"));
+			int    heading           = (int)XPLMGetDataf(XPLMFindDataRef("sim/cockpit2/gauges/indicators/heading_electric_deg_mag_pilot"));
+			int    headingAHARS      = (int)XPLMGetDataf(XPLMFindDataRef("sim/cockpit2/gauges/indicators/heading_AHARS_deg_mag_pilot"));
+			
+			
 
 			int    autoPilotHeading  = (int)XPLMGetDataf(XPLMFindDataRef("sim/cockpit/autopilot/heading"));
 			int    autoPilotAltitude = (int)XPLMGetDataf(XPLMFindDataRef("sim/cockpit/autopilot/altitude"));
@@ -2242,6 +2246,9 @@ float CallBackXPlaneSocketServer(float  inElapsedSinceLastCall,
 			int    autoPilotVsStatus = XPLMGetDatai(XPLMFindDataRef("sim/cockpit2/autopilot/vvi_status"));
 			int    autoPilotAirspeed = (int)XPLMGetDataf(XPLMFindDataRef("sim/cockpit/autopilot/airspeed"));
 			int    autoPilotOnOff    = XPLMGetDatai(XPLMFindDataRef("sim/cockpit2/annunciators/autopilot"));
+
+			// Convert groundSpeed: meters per seconds --> to --> knots per second
+			groundspeed = groundspeed * 1.94384;
 
 			// GPS Destination
 			XPLMNavRef gpsDestination      = XPLMGetGPSDestination();
@@ -2283,6 +2290,8 @@ float CallBackXPlaneSocketServer(float  inElapsedSinceLastCall,
 			oss << "    ,\"currentGPSDistDme\":" << currentGPSDistDme;
 			oss << "    ,\"currentGPSTimeDme\":" << currentGPSTimeDme;
 			oss << "    ,\"destination\":\"" << label << "\"";
+			oss << "    ,\"headingDegMag\":" << headingDegMag;
+			oss << "    ,\"headingAHARS\":" << headingAHARS;
 			oss << "    ,\"heading\":" << heading;
 			oss << "    ,\"autopilot\":";
 			oss << "       {";
