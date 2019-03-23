@@ -14,6 +14,8 @@
 #include <sstream>
 #include "Navaid.h"
 #include <math.h>
+#include <vector>
+#include <fstream>
 
 #define PI 3.14159265f
 #define EARTH_RADIO_KM 6371 // radius of earth in kilometres
@@ -123,5 +125,98 @@ void NavaidManager::calculateTimeFormatted(char* output, int speed, int distance
 	char buffer[10];
 	sprintf(buffer, "%02d:%02d:%02d", arrayTime[0], arrayTime[1], arrayTime[2]);
 	strncpy(output, buffer, 10);
+}
+
+std::vector<string> splitStringBy(std::string line) {
+	std::stringstream lineToSplit(line);
+	std::string segment;
+	std::vector<std::string> seglist;
+	while (std::getline(lineToSplit, segment, ','))
+	{
+		seglist.push_back(segment);
+	}
+	return seglist;
+}
+
+
+NavaidManager::airway_t NavaidManager::readingAirway(std::string xplaneFileAirways, ::string strAirway, std::string strBeginNavaid, std::string strEndNavaid)
+{
+	std::string line;
+	std::string seekAirway    = "A," + strAirway;
+	std::string seekBegNavaid = "S," + strBeginNavaid;
+	std::string seekEndNavaid = "S," + strEndNavaid;
+	char inputFilename[]      = "c:/X-Plane 11/Custom Data/GNS430/navdata/ATS.txt";
+
+	ifstream inFile;
+	inFile.open(inputFilename);
+
+	bool readingAirway = false;
+	bool foundBegNavaid = false;
+	bool foundEndNavaid = false;
+
+	airway_t airway;
+
+	if (inFile) {
+		size_t pos;
+		while (inFile.good() && !foundEndNavaid) {
+			getline(inFile, line);
+
+			if (line.empty() && readingAirway) {
+				// End of an Airway (if were reading a found one before)
+				readingAirway = false;
+				foundBegNavaid = false;
+				foundEndNavaid = false;
+				if (!foundEndNavaid) {
+					airway.navaids.clear();
+				}
+			}
+			else if (readingAirway) {
+				// Already found the Airway and reading its Navaid's lines
+				if (foundBegNavaid) {
+					airwayNavaid_t navaid;
+					std::vector<string> splittedLine = splitStringBy(line);
+					navaid.id = splittedLine.at(1);
+					navaid.latitude = atof(splittedLine.at(2).c_str());
+					navaid.longitude = atof(splittedLine.at(3).c_str());
+					airway.navaids.push_back(navaid);
+
+					// Check if this is the End Navaid Searched
+					pos = line.find(seekEndNavaid);
+					if (pos != std::string::npos)
+					{
+						foundEndNavaid = true;
+					}
+				}
+				else {
+					pos = line.find(seekBegNavaid);
+					if (pos != std::string::npos)
+					{
+						foundBegNavaid = true;
+						airwayNavaid_t navaid;
+						std::vector<string> splittedLine = splitStringBy(line);
+						navaid.id = splittedLine.at(1);
+						navaid.latitude = atof(splittedLine.at(2).c_str());
+						navaid.longitude = atof(splittedLine.at(3).c_str());
+						airway.navaids.push_back(navaid);
+					}
+				}
+			}
+			else {
+				// Check if found the searched airway
+				pos = line.find(seekAirway);
+				if (pos != std::string::npos) {
+					// Searched Airway found
+					readingAirway = true;
+					std::vector<string> splittedLine = splitStringBy(line);
+					airway.id = splittedLine.at(1);
+					airway.sequence = splittedLine.at(2);
+				}
+			}
+		}
+	}
+	else {
+		//"FILE NOT FOUND!!!
+	}
+	return airway;
 }
 

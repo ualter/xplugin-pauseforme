@@ -70,7 +70,7 @@
 #include "NavaidManager.h"
 #include "Navaid.h"
 #include "CallBackHandler.h"
-
+#include <boost/algorithm/string.hpp>
 
 
 #if IBM
@@ -151,7 +151,7 @@ static XPWidgetID wCaptionNavaidDMEDesc;
 static XPWidgetID wTextNavaidDMEDistanceMin;
 static XPWidgetID wDataRef1, wDataRef2, wDataRef3, wDataRefValue1, wDataRefValue2, wDataRefValue3;
 static XPWidgetID wChkDataRef1, wChkDataRef2, wChkDataRef3;
-static XPWidgetID wCaptionDataRef1, wCaptionDataRef2, wCaptionDataRef3;
+static XPWidgetID wCaptionDataRef1, wCaptionDataRef2, wCaptionDataRef3, wTextFlightPlan, wTextTime, wChkTime, wBtnFpTranslate, wBtnFpBringBackOriginal;
 
 int isDataRef1Selected, isDataRef2Selected, isDataRef3Selected;
 
@@ -255,6 +255,12 @@ char debug_message[128];
 char msgPause[128];
 char msgPause2[128];
 std::string fileName = "PauseForMe.ini";
+std::string timePause = "";
+int isTimePauseSelected = 0;
+std::string flightPlan = "";
+int hourTimeZ;
+int minuTimeZ;
+int versionFlightPlan = -1;
 
 Coordenada objCurrentLongitude(2), objCurrentLatitude(2), objUserLongitude(2), objUserLatitude(2);
 int acceptableDifference = 2;
@@ -288,6 +294,10 @@ void sendStartedMessageSocketClients();
 void sendPausedMessageSocketClients();
 void sendUnpausedMessageSocketClients();
 void sendMessageSocketClients(std::string msg);
+
+void translateFlightPlan();
+void bringBackMyFlightPlan();
+std::string writeDownFlightPlan();
 
 XPLMCommandRef SetupOnCommand = NULL;
 XPLMCommandRef SetupOffCommand = NULL;
@@ -616,177 +626,184 @@ void CreateWidgetWindow()
 	// Altitude
 	topY -= 55;
 	tmpY = topY;
+	int altitudeY = topY + 10;
 	int padX = 15;
 	leftX = x + leftMargin + 43 + padX;
 	rightX = leftX + widthCaption;
-	bottomY = topY - heightFields;
-	XPCreateWidget(leftX, topY, rightX, bottomY, 1, "Altitude", 0, wMainWindow, xpWidgetClass_Caption);
+	bottomY = altitudeY - heightFields;
+	XPCreateWidget(leftX, altitudeY, rightX, bottomY, 1, "Altitude", 0, wMainWindow, xpWidgetClass_Caption);
 	// Altitude Checkbox
 	tmpX = leftMargin - 88;
-	wChkAltitude = XPCreateWidget(leftX + tmpX, topY - 5, leftX + tmpX + widthField, bottomY - 5, 1, "", 0, wMainWindow, xpWidgetClass_Button);
+	wChkAltitude = XPCreateWidget(leftX + tmpX, altitudeY - 3, leftX + tmpX + widthField, bottomY - 3, 1, "", 0, wMainWindow, xpWidgetClass_Button);
 	XPSetWidgetProperty(wChkAltitude, xpProperty_ButtonType, xpRadioButton);
 	XPSetWidgetProperty(wChkAltitude, xpProperty_ButtonBehavior, xpButtonBehaviorCheckBox);
 	XPSetWidgetProperty(wChkAltitude, xpProperty_ButtonState, isAltitudeSelected);
 	// Altitude Caption
 	leftX = x + leftMargin + padX;
-	topY -= 30;
+	altitudeY -= 30;
 	widthField = 50;
-	bottomY = topY - heightFields;
-	wCaptionAltitude = XPCreateWidget(leftX, topY, leftX + widthField, bottomY, 1, "0", 0, wMainWindow, xpWidgetClass_Caption);
+	bottomY = altitudeY - heightFields;
+	wCaptionAltitude = XPCreateWidget(leftX, altitudeY, leftX + widthField, bottomY, 1, "0", 0, wMainWindow, xpWidgetClass_Caption);
 	XPSetWidgetProperty(wCaptionAltitude, xpProperty_CaptionLit, 1);
 	// Altitude Text Min
 	leftX += 90;
-	topY += 10;
-	bottomY = topY - heightFields;
+	altitudeY += 10;
+	bottomY = altitudeY - heightFields;
 	widthField = 50;
-	wTextAltitudeMin = XPCreateWidget(leftX, topY, leftX + widthField, bottomY, 1, convertToString(userAltitudeMin).c_str(), 0, wMainWindow, xpWidgetClass_TextField);
+	wTextAltitudeMin = XPCreateWidget(leftX, altitudeY, leftX + widthField, bottomY, 1, convertToString(userAltitudeMin).c_str(), 0, wMainWindow, xpWidgetClass_TextField);
 	XPSetWidgetProperty(wTextAltitudeMin, xpProperty_TextFieldType, xpTextEntryField);
-	XPCreateWidget(x + leftMargin + 60 + padX, topY, x + leftMargin + 65 + padX, bottomY, 1, "Min:", 0, wMainWindow, xpWidgetClass_Caption);
+	XPCreateWidget(x + leftMargin + 60 + padX, altitudeY, x + leftMargin + 65 + padX, bottomY, 1, "Min:", 0, wMainWindow, xpWidgetClass_Caption);
 	// Altitude Text Max
 	leftX = x + leftMargin + 90 + padX;
-	topY -= 20;
-	bottomY = topY - heightFields;
+	altitudeY -= 20;
+	bottomY = altitudeY - heightFields;
 	widthField = 50;
-	wTextAltitudeMax = XPCreateWidget(leftX, topY, leftX + widthField, bottomY, 1, convertToString(userAltitudeMax).c_str(), 0, wMainWindow, xpWidgetClass_TextField);
+	wTextAltitudeMax = XPCreateWidget(leftX, altitudeY, leftX + widthField, bottomY, 1, convertToString(userAltitudeMax).c_str(), 0, wMainWindow, xpWidgetClass_TextField);
 	XPSetWidgetProperty(wTextAltitudeMax, xpProperty_TextFieldType, xpTextEntryField);
-	XPCreateWidget(x + leftMargin + 60 + padX, topY, x + leftMargin + 65 + padX, bottomY, 1, "Max:", 0, wMainWindow, xpWidgetClass_Caption);
+	XPCreateWidget(x + leftMargin + 60 + padX, altitudeY, x + leftMargin + 65 + padX, bottomY, 1, "Max:", 0, wMainWindow, xpWidgetClass_Caption);
+
+	topY -= 40;
 
 	// Airspeed
 	topY = tmpY;
 	tmpX = 170;
+	int airspdY = topY + 10;
 	leftX = x + leftMargin + tmpX + padX + padX;
 	rightX = leftX + widthCaption;
-	bottomY = topY - heightFields;
-	XPCreateWidget(leftX, topY, rightX, bottomY, 1, "Airspeed", 0, wMainWindow, xpWidgetClass_Caption);
+	bottomY = airspdY - heightFields;
+	XPCreateWidget(leftX, airspdY, rightX, bottomY, 1, "Airspeed", 0, wMainWindow, xpWidgetClass_Caption);
 	// Airspeed Checkbox
 	tmpX = tmpX + leftMargin - 88 + padX;
-	wChkAirspeed = XPCreateWidget(leftX - 80, topY - 5, leftX + widthField, bottomY - 5, 1, "", 0, wMainWindow, xpWidgetClass_Button);
+	wChkAirspeed = XPCreateWidget(leftX - 80, airspdY - 2, leftX + widthField, bottomY - 2, 1, "", 0, wMainWindow, xpWidgetClass_Button);
 	XPSetWidgetProperty(wChkAirspeed, xpProperty_ButtonType, xpRadioButton);
 	XPSetWidgetProperty(wChkAirspeed, xpProperty_ButtonBehavior, xpButtonBehaviorCheckBox);
 	XPSetWidgetProperty(wChkAirspeed, xpProperty_ButtonState, isAirspeedSelected);
 	// Airspeed Caption
 	leftX = x + leftMargin + tmpX + padX;
-	topY -= 30;
+	airspdY -= 30;
 	widthField = 50;
-	bottomY = topY - heightFields;
-	wCaptionAirspeed = XPCreateWidget(leftX + 10, topY, leftX + widthField, bottomY, 1, "0", 0, wMainWindow, xpWidgetClass_Caption);
+	bottomY = airspdY - heightFields;
+	wCaptionAirspeed = XPCreateWidget(leftX + 10, airspdY, leftX + widthField, bottomY, 1, "0", 0, wMainWindow, xpWidgetClass_Caption);
 	XPSetWidgetProperty(wCaptionAirspeed, xpProperty_CaptionLit, 1);
 	// Airspeed Text Min
 	leftX += 90;
-	topY += 10;
-	bottomY = topY - heightFields;
+	airspdY += 10;
+	bottomY = airspdY - heightFields;
 	widthField = 50;
-	wTextAirspeedMin = XPCreateWidget(leftX, topY, leftX + widthField, bottomY, 1, convertToString(userAirspeedMin).c_str(), 0, wMainWindow, xpWidgetClass_TextField);
+	wTextAirspeedMin = XPCreateWidget(leftX, airspdY, leftX + widthField, bottomY, 1, convertToString(userAirspeedMin).c_str(), 0, wMainWindow, xpWidgetClass_TextField);
 	XPSetWidgetProperty(wTextAirspeedMin, xpProperty_TextFieldType, xpTextEntryField);
-	XPCreateWidget(x + leftMargin + 60 + tmpX + padX, topY, x + leftMargin + 65 + tmpX + padX, bottomY, 1, "Min:", 0, wMainWindow, xpWidgetClass_Caption);
+	XPCreateWidget(x + leftMargin + 60 + tmpX + padX, airspdY, x + leftMargin + 65 + tmpX + padX, bottomY, 1, "Min:", 0, wMainWindow, xpWidgetClass_Caption);
 	// Airspeed Text Max
 	leftX = x + leftMargin + 90 + tmpX + padX;
-	topY -= 20;
-	bottomY = topY - heightFields;
+	airspdY -= 20;
+	bottomY = airspdY - heightFields;
 	widthField = 50;
-	wTextAirspeedMax = XPCreateWidget(leftX, topY, leftX + widthField, bottomY, 1, convertToString(userAirspeedMax).c_str(), 0, wMainWindow, xpWidgetClass_TextField);
+	wTextAirspeedMax = XPCreateWidget(leftX, airspdY, leftX + widthField, bottomY, 1, convertToString(userAirspeedMax).c_str(), 0, wMainWindow, xpWidgetClass_TextField);
 	XPSetWidgetProperty(wTextAirspeedMax, xpProperty_TextFieldType, xpTextEntryField);
-	XPCreateWidget(x + leftMargin + 60 + tmpX + padX, topY, x + leftMargin + 65 + tmpX + padX, bottomY, 1, "Max:", 0, wMainWindow, xpWidgetClass_Caption);
+
+	topY -= 40;
 
 	// GPS
-	topY = tmpY + 18;
-	tmpX = 600;
+	topY     = tmpY + 18;
+	int gpsY = topY + 5;
+	tmpX = 660;
 	leftX = x + leftMargin + tmpX + padX + padX;
 	rightX = leftX + widthCaption;
-	bottomY = topY - heightFields;
-	XPCreateWidget(leftX, topY, rightX, bottomY, 1, "GPS", 0, wMainWindow, xpWidgetClass_Caption);
+	bottomY = gpsY - heightFields;
+	XPCreateWidget(leftX, gpsY - 3, rightX, bottomY - 3, 1, "GPS", 0, wMainWindow, xpWidgetClass_Caption);
 	// GPS Checkbox
 	tmpX = tmpX + leftMargin - 88 + padX;
-	wChkGPS = XPCreateWidget(leftX - 80, topY - 5, leftX + widthField, bottomY - 5, 1, "", 0, wMainWindow, xpWidgetClass_Button);
+	wChkGPS = XPCreateWidget(leftX - 80, gpsY - 5, leftX + widthField, bottomY - 5, 1, "", 0, wMainWindow, xpWidgetClass_Button);
 	XPSetWidgetProperty(wChkGPS, xpProperty_ButtonType, xpRadioButton);
 	XPSetWidgetProperty(wChkGPS, xpProperty_ButtonBehavior, xpButtonBehaviorCheckBox);
 	XPSetWidgetProperty(wChkGPS, xpProperty_ButtonState, isGPSSelected);
 	// GPS Caption
 	leftX = x + leftMargin + tmpX + padX;
-	topY -= 22;
+	gpsY -= 22;
 	widthField = 50;
-	bottomY = topY - heightFields;
-	wCaptionGPS = XPCreateWidget(leftX - 80, topY, (leftX - 80) + 150, bottomY, 1, "0", 0, wMainWindow, xpWidgetClass_Caption);
+	bottomY = gpsY - heightFields;
+	wCaptionGPS = XPCreateWidget(leftX - 80, gpsY, (leftX - 80) + 150, bottomY, 1, "0", 0, wMainWindow, xpWidgetClass_Caption);
 	XPSetWidgetProperty(wCaptionGPS, xpProperty_CaptionLit, 1);
 	// GPS DME Distance Caption
-	topY -= 34; bottomY = topY - heightFields;
-	XPCreateWidget(leftX - 8, topY + 35, rightX + 10, bottomY, 1, "Min", 0, wMainWindow, xpWidgetClass_Caption);
-	XPCreateWidget(leftX + 155, topY + 35, rightX + 165, bottomY, 1, "Max", 0, wMainWindow, xpWidgetClass_Caption);
-	XPCreateWidget(leftX - 100, topY, rightX, bottomY, 1, "DME Distance:", 0, wMainWindow, xpWidgetClass_Caption);
+	gpsY -= 34; bottomY = gpsY - heightFields;
+	XPCreateWidget(leftX - 8, gpsY + 35, rightX + 10, bottomY, 1, "Min", 0, wMainWindow, xpWidgetClass_Caption);
+	XPCreateWidget(leftX + 155, gpsY + 35, rightX + 165, bottomY, 1, "Max", 0, wMainWindow, xpWidgetClass_Caption);
+	XPCreateWidget(leftX - 100, gpsY, rightX, bottomY, 1, "DME Distance:", 0, wMainWindow, xpWidgetClass_Caption);
 	// GPS DME Distance Text Min.
 	tmpX = leftX - 18;
-	wTextGPSDmeDistanceMin = XPCreateWidget(tmpX, topY, tmpX + widthField, bottomY, 1, convertToString(userGPSDmeDistanceMin).c_str(), 0, wMainWindow, xpWidgetClass_TextField);
+	wTextGPSDmeDistanceMin = XPCreateWidget(tmpX, gpsY, tmpX + widthField, bottomY, 1, convertToString(userGPSDmeDistanceMin).c_str(), 0, wMainWindow, xpWidgetClass_TextField);
 	XPSetWidgetProperty(wTextGPSDmeDistanceMin, xpProperty_TextFieldType, xpTextEntryField);
-	XPCreateWidget(tmpX + widthField, topY, tmpX + widthField + 10, bottomY, 1, ">=", 0, wMainWindow, xpWidgetClass_Caption);
+	XPCreateWidget(tmpX + widthField, gpsY, tmpX + widthField + 10, bottomY, 1, ">=", 0, wMainWindow, xpWidgetClass_Caption);
 	tmpX = leftX + widthField + 3;
-	wCaptionGPSDmeDistance = XPCreateWidget(tmpX, topY, tmpX + widthField, bottomY, 1, "0", 0, wMainWindow, xpWidgetClass_Caption);
+	wCaptionGPSDmeDistance = XPCreateWidget(tmpX, gpsY, tmpX + widthField, bottomY, 1, "0", 0, wMainWindow, xpWidgetClass_Caption);
 	XPSetWidgetProperty(wCaptionGPSDmeDistance, xpProperty_CaptionLit, 1);
 	// GPS DME Distance Text Max.
 	tmpX = leftX + widthField + widthField + 45;
-	wTextGPSDmeDistanceMax = XPCreateWidget(tmpX, topY, tmpX + widthField, bottomY, 1, convertToString(userGPSDmeDistanceMax).c_str(), 0, wMainWindow, xpWidgetClass_TextField);
+	wTextGPSDmeDistanceMax = XPCreateWidget(tmpX, gpsY, tmpX + widthField, bottomY, 1, convertToString(userGPSDmeDistanceMax).c_str(), 0, wMainWindow, xpWidgetClass_TextField);
 	XPSetWidgetProperty(wTextGPSDmeDistanceMax, xpProperty_TextFieldType, xpTextEntryField);
 	tmpX = leftX + widthField + 70;
-	XPCreateWidget(tmpX, topY, tmpX + 10, bottomY, 1, ">=", 0, wMainWindow, xpWidgetClass_Caption);
-
+	XPCreateWidget(tmpX, gpsY, tmpX + 10, bottomY, 1, ">=", 0, wMainWindow, xpWidgetClass_Caption);
 	// GPS DME Time Min.
-	topY -= 18; bottomY = topY - heightFields;
-	XPCreateWidget(leftX - 100, topY, rightX, bottomY, 1, "DME Time:", 0, wMainWindow, xpWidgetClass_Caption);
+	gpsY -= 18; bottomY = gpsY - heightFields;
+	XPCreateWidget(leftX - 100, gpsY, rightX, bottomY, 1, "DME Time:", 0, wMainWindow, xpWidgetClass_Caption);
 	// GPS DME Time Text Min.
 	tmpX = leftX - 18;
-	wTextGPSDmeTimeMin = XPCreateWidget(tmpX, topY, tmpX + widthField, bottomY, 1, convertToString(userGPSDmeTimeMin).c_str(), 0, wMainWindow, xpWidgetClass_TextField);
+	wTextGPSDmeTimeMin = XPCreateWidget(tmpX, gpsY, tmpX + widthField, bottomY, 1, convertToString(userGPSDmeTimeMin).c_str(), 0, wMainWindow, xpWidgetClass_TextField);
 	XPSetWidgetProperty(wTextGPSDmeTimeMin, xpProperty_TextFieldType, xpTextEntryField);
-	XPCreateWidget(tmpX + widthField, topY, tmpX + widthField + 10, bottomY, 1, ">=", 0, wMainWindow, xpWidgetClass_Caption);
+	XPCreateWidget(tmpX + widthField, gpsY, tmpX + widthField + 10, bottomY, 1, ">=", 0, wMainWindow, xpWidgetClass_Caption);
 	tmpX = leftX + widthField + 3;
-	wCaptionGPSDmeTime = XPCreateWidget(tmpX, topY, tmpX + widthField, bottomY, 1, "0", 0, wMainWindow, xpWidgetClass_Caption);
+	wCaptionGPSDmeTime = XPCreateWidget(tmpX, gpsY, tmpX + widthField, bottomY, 1, "0", 0, wMainWindow, xpWidgetClass_Caption);
 	XPSetWidgetProperty(wCaptionGPSDmeTime, xpProperty_CaptionLit, 1);
 	// GPS DME Time Text Max.
 	tmpX = leftX + widthField + widthField + 45;
-	wTextGPSDmeTimeMax = XPCreateWidget(tmpX, topY, tmpX + widthField, bottomY, 1, convertToString(userGPSDmeTimeMax).c_str(), 0, wMainWindow, xpWidgetClass_TextField);
+	wTextGPSDmeTimeMax = XPCreateWidget(tmpX, gpsY, tmpX + widthField, bottomY, 1, convertToString(userGPSDmeTimeMax).c_str(), 0, wMainWindow, xpWidgetClass_TextField);
 	XPSetWidgetProperty(wTextGPSDmeTimeMax, xpProperty_TextFieldType, xpTextEntryField);
 	tmpX = leftX + widthField + 70;
-	XPCreateWidget(tmpX, topY, tmpX + 10, bottomY, 1, ">=", 0, wMainWindow, xpWidgetClass_Caption);
+	XPCreateWidget(tmpX, gpsY, tmpX + 10, bottomY, 1, ">=", 0, wMainWindow, xpWidgetClass_Caption);
 
-	topY -= 30;
+	topY -= 104;
 
 	// Latitude e Longitude
-	leftX = x + leftMargin + 28;
+	leftX = x + leftMargin + 35;
 	int leftXLatLong = leftX;
 	rightX = leftX;
 	bottomY = topY - 10;
 	tmpY = topY;
 	tmpX = leftX;
-	int topYlatLong = topY;
-	XPCreateWidget(leftX + 20, topY, rightX + 100, bottomY, 1, "Latitude / Longitude (Decimal degrees)", 0, wMainWindow, xpWidgetClass_Caption);
+	int latLngY = topY;
+	int topYlatLong = topY + 30;
+	XPCreateWidget(leftX + 5, topYlatLong - 5, rightX + 100, bottomY - 5, 1, "Latitude / Longitude (Decimal degrees)", 0, wMainWindow, xpWidgetClass_Caption);
 	leftX -= 30;
-	topY -= 20;
-	wChkLatLon = XPCreateWidget(leftX, topY, leftX + widthField, bottomY - 40, 1, "", 0, wMainWindow, xpWidgetClass_Button);
+	topYlatLong -= 20;
+	wChkLatLon = XPCreateWidget(leftX, topYlatLong, leftX + widthField, bottomY - 40, 1, "", 0, wMainWindow, xpWidgetClass_Button);
 	XPSetWidgetProperty(wChkLatLon, xpProperty_ButtonType, xpRadioButton);
 	XPSetWidgetProperty(wChkLatLon, xpProperty_ButtonBehavior, xpButtonBehaviorCheckBox);
 	XPSetWidgetProperty(wChkLatLon, xpProperty_ButtonState, isLatLongSelected);
 	leftX += 45;
-	topY += 5;
-	wCaptionLatLon = XPCreateWidget(leftX, topY, leftX + 100, bottomY - 40, 1, "00.000 / 00.000", 0, wMainWindow, xpWidgetClass_Caption);
+	topYlatLong += 5;
+	wCaptionLatLon = XPCreateWidget(leftX, topYlatLong, leftX + 100, bottomY - 40, 1, "00.000 / 00.000", 0, wMainWindow, xpWidgetClass_Caption);
 	XPSetWidgetProperty(wCaptionGPS, xpProperty_CaptionLit, 1);
 	leftX += 100;
 	bottomY -= 40;
-	XPCreateWidget(leftX, topY, leftX + 100, bottomY, 1, "=", 0, wMainWindow, xpWidgetClass_Caption);
+	XPCreateWidget(leftX, topYlatLong, leftX + 100, bottomY, 1, "=", 0, wMainWindow, xpWidgetClass_Caption);
 	leftX += 15;
-	topY -= 3;
+	topYlatLong -= 3;
 	bottomY -= 3;
-	wTextLatitude = XPCreateWidget(leftX, topY, leftX + 55, bottomY, 1, objUserLatitude.getValorStr().c_str(), 0, wMainWindow, xpWidgetClass_TextField);
+	wTextLatitude = XPCreateWidget(leftX, topYlatLong, leftX + 55, bottomY, 1, objUserLatitude.getValorStr().c_str(), 0, wMainWindow, xpWidgetClass_TextField);
 	XPSetWidgetProperty(wTextLatitude, xpProperty_TextFieldType, xpTextEntryField);
 	XPSetWidgetProperty(wTextLatitude, xpProperty_MaxCharacters, 7);
 	leftX += 58;
-	topY += 3;
+	topYlatLong += 3;
 	bottomY += 3;
-	XPCreateWidget(leftX, topY, leftX + 100, bottomY, 1, "/", 0, wMainWindow, xpWidgetClass_Caption);
+	XPCreateWidget(leftX, topYlatLong, leftX + 100, bottomY, 1, "/", 0, wMainWindow, xpWidgetClass_Caption);
 	leftX += 12;
-	topY -= 3;
+	topYlatLong -= 3;
 	bottomY -= 3;
-	wTextLongitude = XPCreateWidget(leftX, topY, leftX + 55, bottomY, 1, objUserLongitude.getValorStr().c_str(), 0, wMainWindow, xpWidgetClass_TextField);
+	wTextLongitude = XPCreateWidget(leftX, topYlatLong, leftX + 55, bottomY, 1, objUserLongitude.getValorStr().c_str(), 0, wMainWindow, xpWidgetClass_TextField);
 	XPSetWidgetProperty(wTextLongitude, xpProperty_TextFieldType, xpTextEntryField);
 	XPSetWidgetProperty(wTextLongitude, xpProperty_MaxCharacters, 7);
-	
+
+	topY -= 12;
 
 	// Navaids
 	int hTextField = 22;
@@ -966,11 +983,11 @@ void CreateWidgetWindow()
 
 	// Datarefs
 	int dataRefleftX   = leftXLatLong;
-	int dataReftopY    = topYlatLong - 60;
+	int dataReftopY    = topYlatLong - 65;
 	int dataRefRightX  = dataRefleftX;
-	int dataRefBottomY = topYlatLong - 80;
-	XPCreateWidget(dataRefleftX + 30, dataReftopY - 5, dataRefRightX + 130, dataRefBottomY - 5, 1, " ------ Pause with DataRefs ------", 0, wMainWindow, xpWidgetClass_Caption);
-	XPCreateWidget(dataRefleftX - 18, dataReftopY - 15, dataRefRightX + 50, dataRefBottomY - 25, 1, "DataRef...", 0, wMainWindow, xpWidgetClass_Caption);
+	int dataRefBottomY = topYlatLong - 75;
+	XPCreateWidget(dataRefleftX + 35, dataReftopY - 5, dataRefRightX + 130, dataRefBottomY - 5, 1, "        Pause with DataRefs       ", 0, wMainWindow, xpWidgetClass_Caption);
+	XPCreateWidget(dataRefleftX - 28, dataReftopY - 15, dataRefRightX + 50, dataRefBottomY - 25, 1, "DataRef...", 0, wMainWindow, xpWidgetClass_Caption);
 	XPCreateWidget(dataRefleftX + 255, dataReftopY - 15, dataRefRightX + 265, dataRefBottomY - 25, 1, "Pause when...", 0, wMainWindow, xpWidgetClass_Caption);
 
 	int sizeDataRefField      = 260;
@@ -1037,19 +1054,48 @@ void CreateWidgetWindow()
 	wCaptionDataRef3 = XPCreateWidget(xDataRef, dataReftopY + 1, xDataRef + 10, dataRefBottomY + 1, 1, "-----", 0, wMainWindow, xpWidgetClass_Caption);
 	XPSetWidgetProperty(wCaptionDataRef3, xpProperty_CaptionLit, 0);
 
+	//*********************************************************************************************************************************
+
+	// Time
+	int timeX = x    + 440;
+	int timeY = topY + 190;
+	           XPCreateWidget(timeX + 12, timeY + 21, timeX + 18, timeY + 8, 1, "Time", 0, wMainWindow, xpWidgetClass_Caption);
+	wChkTime = XPCreateWidget(timeX - 3, timeY + 24, timeX + 5 , timeY, 1, "", 0, wMainWindow, xpWidgetClass_Button);
+	XPSetWidgetProperty(wChkTime, xpProperty_ButtonType, xpRadioButton);
+	XPSetWidgetProperty(wChkTime, xpProperty_ButtonBehavior, xpButtonBehaviorCheckBox);
+	XPSetWidgetProperty(wChkTime, xpProperty_ButtonState, isTimePauseSelected);
+
+	wTextTime = XPCreateWidget(timeX, timeY, timeX + 42, timeY - 23, 1, timePause.c_str(), 0, wMainWindow, xpWidgetClass_TextField);
+	XPSetWidgetProperty(wTextTime, xpProperty_TextFieldType, xpTextEntryField);
+	XPSetWidgetProperty(wTextTime, xpProperty_MaxCharacters, 5);
+	
+
+	//*********************************************************************************************************************************
+
+	//Flight Plan
+	int fpX = x + 43;
+	int fpY = topY + 17;
+	XPCreateWidget(fpX-3, fpY - 51, fpX + 50, fpY - 61, 1, "Flight Plan:", 0, wMainWindow, xpWidgetClass_Caption);
+	wTextFlightPlan = XPCreateWidget(fpX, fpY - 65, fpX + 550, fpY - 85, 1, flightPlan.c_str(), 0, wMainWindow, xpWidgetClass_TextField);
+	XPSetWidgetProperty(wTextFlightPlan, xpProperty_TextFieldType, xpTextEntryField);
+	XPSetWidgetProperty(wTextFlightPlan, xpProperty_MaxCharacters, 200);
+	wBtnFpTranslate = XPCreateWidget(fpX, fpY - 87, fpX + 124, fpY - 97, 1, "Translate Flight Plan", 0, wMainWindow, xpWidgetClass_Button);
+	XPSetWidgetProperty(wBtnFpTranslate, xpProperty_ButtonType, xpPushButton);
+	wBtnFpBringBackOriginal = XPCreateWidget(fpX + 126, fpY - 87, fpX + 246, fpY - 97, 1, "Bring Back my Plan", 0, wMainWindow, xpWidgetClass_Button);
+	XPSetWidgetProperty(wBtnFpBringBackOriginal, xpProperty_ButtonType, xpPushButton);
 
 	//*********************************************************************************************************************************
 
 	topY -= 45;
 
 	// Button Save
-	tmpX = 340;
+	tmpX = 630;
 	leftX = x + tmpX;
 	bottomY = topY - heightFields - 5;
 	wBtnSave = XPCreateWidget(leftX, topY, leftX + 60, bottomY, 1, "Save", 0, wMainWindow, xpWidgetClass_Button);
 	XPSetWidgetProperty(wBtnSave, xpProperty_ButtonType, xpPushButton);
 	// Button Exit
-	leftX = x + (tmpX + 100);
+	leftX = x + (tmpX + 70);
 	bottomY = topY - heightFields - 5;
 	wBtnCancel = XPCreateWidget(leftX, topY, leftX + 60, bottomY, 1, "Exit", 0, wMainWindow, xpWidgetClass_Button);
 	XPSetWidgetProperty(wBtnCancel, xpProperty_ButtonType, xpPushButton);
@@ -1058,12 +1104,13 @@ void CreateWidgetWindow()
 	if ( serverSocketStarted ) {
 		btnLabelTransmitter = "STOP Transmitter";
 	}
-	leftX = x + (tmpX + 190);
+	leftX = x + (tmpX + 140);
 	bottomY = topY - heightFields - 5;
 	wBtnStopStartWebSocket = XPCreateWidget(leftX, topY, leftX + 125, bottomY, 1, btnLabelTransmitter.c_str(), 0, wMainWindow, xpWidgetClass_Button);
 	XPSetWidgetProperty(wBtnStopStartWebSocket, xpProperty_ButtonType, xpPushButton);
 
-	topY -= 30;
+	topY -= 28;
+	leftX = 620;
 	XPWidgetID email = XPCreateWidget(leftX + 233, topY, leftX + 283, topY - 5, 1, "ualter.junior@gmail.com", 0, wMainWindow, xpWidgetClass_Caption);
 	XPSetWidgetProperty(email, xpProperty_CaptionLit, 1);
 	
@@ -1075,10 +1122,10 @@ void CreateWidgetWindow()
 	// Just For Debug Purposes
 
 	// Button Reload
-	//leftX += 100;
-	//bottomY = topY-heightFields;
-	//wBtnReload = XPCreateWidget(leftX, topY-5, leftX+80, bottomY,1,"Reload",0,wMainWindow,xpWidgetClass_Button);
-	//XPSetWidgetProperty(wBtnReload,xpProperty_ButtonType,xpPushButton);
+	leftX += 100;
+	bottomY = topY-heightFields;
+	wBtnReload = XPCreateWidget(leftX, topY-5, leftX+80, bottomY,1,"Reload",0,wMainWindow,xpWidgetClass_Button);
+	XPSetWidgetProperty(wBtnReload,xpProperty_ButtonType,xpPushButton);
 	
 	//topY -= 15;
 	//bottomY = topY-heightFields;
@@ -1157,6 +1204,9 @@ void saveFileValues()
 	fileIniWriter << "dataRefValue2=" + dataRefValue2 + "\n";
 	fileIniWriter << "dataRef3=" + dataRef3 + "\n";
 	fileIniWriter << "dataRefValue3=" + dataRefValue3 + "\n";
+
+	fileIniWriter << "timePause=" + timePause + "\n";
+	fileIniWriter << "flightPlan=" + flightPlan + "\n";
 
 	fileIniWriter.close();
 }
@@ -1272,6 +1322,25 @@ int widgetWidgetHandler(XPWidgetMessage			inMessage,
 			XPGetWidgetDescriptor(wDataRefValue3, buffer, sizeof(buffer));
 			dataRefValue3 = buffer;
 
+			// Time
+			XPGetWidgetDescriptor(wTextTime, buffer, sizeof(buffer));
+			timePause = buffer;
+
+			// Flight Plan
+			XPGetWidgetDescriptor(wTextFlightPlan, buffer, sizeof(buffer));
+			std::string fp = buffer;
+			if (fp.compare(flightPlan) != 0) {
+				versionFlightPlan++;
+			}
+			flightPlan = buffer;
+
+			// Send Flight Plan if the Transmitter is OPEN
+			std::string jsonFP = writeDownFlightPlan();
+			log(jsonFP);
+			if (serverSocketStarted) {
+				socketServer->broadcast(jsonFP);
+			}
+
 			saveFileValues();
 			return 1;
 		}
@@ -1295,7 +1364,16 @@ int widgetWidgetHandler(XPWidgetMessage			inMessage,
 		if (inParam1 == (intptr_t)wBtnStopStartWebSocket)
 		{
 			switchSocketServer();
-			
+			return 1;
+		}
+		if (inParam1 == (intptr_t)wBtnFpTranslate)
+		{
+			translateFlightPlan();
+			return 1;
+		}
+		if (inParam1 == (intptr_t)wBtnFpBringBackOriginal)
+		{
+			bringBackMyFlightPlan();
 			return 1;
 		}
 	}
@@ -1399,6 +1477,12 @@ int widgetWidgetHandler(XPWidgetMessage			inMessage,
 			long isStateTrue = XPGetWidgetProperty(wChkDataRef3, xpProperty_ButtonState, 0);
 			isStateTrue ? isDataRef3Selected = 1 : isDataRef3Selected = 0;
 			resetDataRefsValues();
+			return 1;
+		}
+		if (inParam1 == (intptr_t)wChkTime)
+		{
+			long isStateTrue = XPGetWidgetProperty(wChkTime, xpProperty_ButtonState, 0);
+			isStateTrue ? isTimePauseSelected = 1 : isTimePauseSelected = 0;
 			return 1;
 		}
 	}
@@ -1668,8 +1752,6 @@ void getXPlaneDataInfos()
 	XPSetWidgetDescriptor(wCaptionTimeDmeNav2, label);
 	XPSetWidgetDescriptor(wHSIAlignmentNav2, formatNumber(currentHsiAlignmentNav2, 2).c_str());
 
-	
-
 	// Feed Info About Navaids
 	navaidAirport = setInfoNavaid(4,wTextNavaidAirportID, wCaptionNavaidAirportDistance, wCaptionNavaidAirportDesc,
 		currentLatitude, currentLongitude, xplm_Nav_Airport);
@@ -1682,6 +1764,10 @@ void getXPlaneDataInfos()
 	navaidDME = setInfoNavaid(2, wTextNavaidDMEID, wCaptionNavaidDMEDistance, wCaptionNavaidDMEDesc,
 		currentLatitude, currentLongitude, xplm_Nav_DME);
 
+	// Time
+	hourTimeZ = XPLMGetDatai(XPLMFindDataRef("sim/cockpit2/clock_timer/zulu_time_hours"));
+	minuTimeZ = XPLMGetDatai(XPLMFindDataRef("sim/cockpit2/clock_timer/zulu_time_minutes"));
+	
 }
 
 std::string checkSignal(int vlrDir, int vlrEsq) {
@@ -1915,6 +2001,21 @@ float pauseXPlane() {
 		if (result == 1) {
 			wChkToUnSelect     = wChkDataRef3;
 			isDataRef3Selected = 0;
+		}
+	}
+
+	if (isTimePauseSelected) {
+		if (timePause.length() == 5) {
+			int hourPause = atoi(timePause.substr(0, 2).c_str());
+			int minPause = atoi(timePause.substr(3, 5).c_str());
+
+			if ( hourPause == hourTimeZ && minPause == minuTimeZ ) {
+				sprintf(msgPause, "Time   ==   %s hrs", timePause.c_str());
+				result              = 1;
+				isTimePauseSelected = 0;
+				wChkToUnSelect = wChkTime;
+				
+			}
 		}
 	}
 
@@ -2253,7 +2354,6 @@ float CallBackXPlaneSocketServer(float  inElapsedSinceLastCall,
 			// GPS Destination
 			XPLMNavRef gpsDestination      = XPLMGetGPSDestination();
 			XPLMNavType gpsDestinationType = XPLMGetGPSDestinationType();
-
 			char label[256];
 			int  outFrequency;
 			char outID[10];
@@ -2529,6 +2629,14 @@ void checkPreferenceFile() {
 			if (strcmp(param.c_str(), "dataRefValue3") == 0) {
 				dataRefValue3 = value.c_str();
 			}
+			else
+			if (strcmp(param.c_str(), "timePause") == 0) {
+				timePause = value.c_str();
+			}
+			else
+			if (strcmp(param.c_str(), "flightPlan") == 0) {
+				flightPlan = value.c_str();
+			}
 		}
 		fileIniReader.close();
 	} else {
@@ -2573,6 +2681,8 @@ void checkPreferenceFile() {
 
 		fileIniWriter << "dataRef1=sim/cockpit/electrical/battery_on\n";
 		fileIniWriter << "dataRefValue1=0\n";
+
+		fileIniWriter << "timePause=22:10\n";
 
 		fileIniWriter.close();
 	}
@@ -2707,4 +2817,162 @@ void startSocketServer() {
 		XPSetWidgetDescriptor(wBtnStopStartWebSocket, "STOP Transmitter");
 		sendStartedMessageSocketClients();
 	}
+}
+
+/**
+ Building Flight Plan JSON
+*/
+std::string writeDownFlightPlan() {
+	std::ostringstream oss;
+	oss << "{ \"flightPlan\": {";
+
+	oss << "  \"version\":" << versionFlightPlan << ",";
+	oss << "  \"waypoints\":[";
+
+	// Building the Flight Plan
+	float myCurrentLatitude = XPLMGetDataf(XPLMFindDataRef("sim/flightmodel/position/latitude"));
+	float myCurrentLongitude = XPLMGetDataf(XPLMFindDataRef("sim/flightmodel/position/longitude"));
+	char buffer[200];
+	XPGetWidgetDescriptor(wTextFlightPlan, buffer, sizeof(buffer));
+	int index = 0;
+	std::string text = buffer;
+	std::istringstream iss(text);
+	std::vector<std::string> results((std::istream_iterator<std::string>(iss)), std::istream_iterator<std::string>());
+	for (std::vector<string>::iterator it = results.begin(); it != results.end(); it++) {
+		std::string navId = *it;
+		boost::to_upper(navId);
+
+		XPLMNavRef navRef;
+		if (navId.length() == 3) {
+			navRef = XPLMFindNavAid(NULL, navId.c_str(), &myCurrentLatitude, &myCurrentLongitude, NULL, xplm_Nav_NDB | xplm_Nav_VOR | xplm_Nav_ILS | xplm_Nav_Localizer );
+		} else
+		if (navId.length() == 4) {
+			navRef = XPLMFindNavAid(NULL, navId.c_str(), &myCurrentLatitude, &myCurrentLongitude, NULL, xplm_Nav_Airport);
+		} else
+		if (navId.length() == 5) {
+			navRef = XPLMFindNavAid(NULL, navId.c_str(), &myCurrentLatitude, &myCurrentLongitude, NULL, xplm_Nav_Fix);
+		}
+		else {
+			navRef = XPLMFindNavAid(NULL, navId.c_str(), &myCurrentLatitude, &myCurrentLongitude, NULL, xplm_Nav_Unknown | xplm_Nav_Airport | xplm_Nav_NDB | xplm_Nav_VOR | xplm_Nav_ILS 
+				| xplm_Nav_Localizer | xplm_Nav_GlideSlope | xplm_Nav_OuterMarker | xplm_Nav_MiddleMarker | xplm_Nav_InnerMarker | xplm_Nav_Fix | xplm_Nav_DME | xplm_Nav_LatLon );
+		}
+
+		int   outFrequency;
+		char  outID[10];
+		char  outName[256];
+		float outLatitude;
+		float outLongitude;
+		float outHeading;
+		XPLMNavType outType;
+		
+		XPLMGetNavAidInfo(navRef, &outType, &outLatitude, &outLongitude, NULL, &outFrequency, &outHeading, outID, outName, NULL);
+		if (strcmp(outID, "----") != 0) {
+			index++;
+			if (index > 1) {
+		        oss << "       ,";
+			}
+			oss << "      {";
+			oss << "        \"version\":" << index << ",";
+			oss << "        \"id\":\"" << outID << "\",";
+			oss << "        \"name\":\"" << outName << "\",";
+			oss << "        \"latitude\":\"" << outLatitude << "\",";
+			oss << "        \"longitude\":\"" << outLongitude << "\",";
+			oss << "        \"type\":\"" << getDescriptionGPSDestinationType(outType) << "\"";
+			oss << "      }";
+		}
+		else {
+			log(navId + " Not Found at Flight Plan Search");
+		}
+
+	}
+	oss << "    ]";
+	oss << "}}";
+	return oss.str();
+}
+
+void translateFlightPlan() {
+	char buffer[200];
+	XPGetWidgetDescriptor(wTextFlightPlan, buffer, sizeof(buffer));
+	std::string text = buffer;
+	std::istringstream iss(text);
+	std::list<string> listTranslatedFp;
+
+	int index = 0;
+	std::string navIdBefore;
+	std::string navIdAfter;
+	std::vector<std::string> results((std::istream_iterator<std::string>(iss)), std::istream_iterator<std::string>());
+	for (std::vector<string>::iterator it = results.begin(); it != results.end(); it++) {
+		std::string navId = *it;
+		boost::to_upper(navId);
+
+		// It must have the Start Navaid and the End Navaid as references to look for a specific Airway, otherwise it is impossible to have an unique logic to identify the searched Airway 
+		// For example:  
+		//    NTM UN857 VELIN (VALID) --> That's ok, as with this referentes a unique Airway should be found     
+		//    LEBL SLL NTM UN857 VELIN (VALID) --> That's ok, as with this referentes a unique Airway should be found
+		//    UN857 VELIN (INVALID) --> There will be found more than one UN857
+		//    NTM UN857 (INVALID) --> There will be found more than one UN857
+		if (index > 0 && index < (results.size()-1) ) { // Only from the Second to the one before the last element
+
+			// Get the Previous and the Posterior Navaid informed together with the Airway (airway is always in the middle of the Start-End of its navaids, must be!)
+			navIdBefore = results.at(index - 1);
+			navIdAfter  = results.at(index + 1);
+
+			// Localize (check if this is a Airway) the Airway with the parameters
+			NavaidManager::airway_t airway = navManager.readingAirway("c:/X-Plane 11/Custom Data/GNS430/navdata/ATS.txt", navId, navIdBefore, navIdAfter);
+			if (!airway.id.empty() && !airway.navaids.empty() && airway.navaids.size() > 0) {
+				// Airway identified (found)
+				// Remove the last one inserted , because it will be present on the first occurence of the Airway
+				listTranslatedFp.pop_back();
+
+				// Iterate over all the its returned Navaids 
+				std::list<NavaidManager::airwayNavaid_t>::iterator itAirways = airway.navaids.begin();
+				int indexAirwayNavaids = 0;
+				while (itAirways != airway.navaids.end()) {
+					NavaidManager::airwayNavaid_t navaid = *itAirways;
+					indexAirwayNavaids++;
+
+					// Debug purposes
+					//char bf[64];
+					//sprintf(bf, "     (%d) %s (%f/%f)", indexAirwayNavaids, navaid.id.c_str(), navaid.latitude, navaid.longitude);
+					//log(bf);
+
+					itAirways++;
+					// Add all the new Navaids in between (Start-End) from the Airway
+					listTranslatedFp.push_back(navaid.id);
+				}
+				if (indexAirwayNavaids > 0) {
+					// Remove the last one inserted from the Airway section, because it will be present on the next occurence of this FlightPlan as the End Marker of the Airway we just read
+					listTranslatedFp.pop_back();
+				}
+			}
+			else {
+				//log(navId + " Is Not an Airway (ignoring..)");
+				listTranslatedFp.push_back(navId);
+			}
+		}
+		else {
+			listTranslatedFp.push_back(navId);
+		}
+		index++;
+	}
+
+	index = 0;
+	std::ostringstream newFlightPlan;
+	std::list<string>::iterator itAirwaysTranslated = listTranslatedFp.begin();
+	while (itAirwaysTranslated != listTranslatedFp.end()) {
+		if (index > 0) {
+			newFlightPlan << " " << *itAirwaysTranslated;
+		}
+		else {
+			newFlightPlan << *itAirwaysTranslated;
+		}
+		itAirwaysTranslated++;
+		index++;
+	}
+	//log(newFlightPlan.str());
+	XPSetWidgetDescriptor(wTextFlightPlan, newFlightPlan.str().c_str());
+}
+
+void bringBackMyFlightPlan() {
+	XPSetWidgetDescriptor(wTextFlightPlan, flightPlan.c_str());
 }
