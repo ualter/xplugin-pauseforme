@@ -138,17 +138,24 @@ std::vector<string> splitStringBy(std::string line) {
 	return seglist;
 }
 
+void convertLineToNavaidAddToAirway(std::string line, struct NavaidManager::airway_t *airway) {
+	NavaidManager::airwayNavaid_t navaid;
+	std::vector<string> splittedLine = splitStringBy(line);
+	navaid.id = splittedLine.at(1);
+	navaid.latitude = atof(splittedLine.at(2).c_str());
+	navaid.longitude = atof(splittedLine.at(3).c_str());
+	airway->navaids.push_back(navaid);
+}
 
 NavaidManager::airway_t NavaidManager::readingAirway(std::string xplaneFileAirways, ::string strAirway, std::string strBeginNavaid, std::string strEndNavaid)
 {
 	std::string line;
-	std::string seekAirway    = "A," + strAirway;
-	std::string seekBegNavaid = "S," + strBeginNavaid;
-	std::string seekEndNavaid = "S," + strEndNavaid;
-	char inputFilename[]      = "c:/X-Plane 11/Custom Data/GNS430/navdata/ATS.txt";
+	std::string seekAirway    = "A," + strAirway      + ",";
+	std::string seekBegNavaid = "S," + strBeginNavaid + ",";
+	std::string seekEndNavaid = "S," + strEndNavaid   + ",";
 
 	ifstream inFile;
-	inFile.open(inputFilename);
+	inFile.open(xplaneFileAirways.c_str());
 
 	bool readingAirway = false;
 	bool foundBegNavaid = false;
@@ -161,43 +168,52 @@ NavaidManager::airway_t NavaidManager::readingAirway(std::string xplaneFileAirwa
 		while (inFile.good() && !foundEndNavaid) {
 			getline(inFile, line);
 
-			if (line.empty() && readingAirway) {
-				// End of an Airway (if were reading a found one before)
-				readingAirway = false;
-				foundBegNavaid = false;
-				foundEndNavaid = false;
-				if (!foundEndNavaid) {
-					airway.navaids.clear();
+			if (readingAirway && (line.empty() || line.find("A,") == 0)) {
+				if (!foundBegNavaid) {
+					// Check if the next Airway has the same name we are looking for AND we didn't find the Beginnig Navaid yet so far, 
+					// (If we didn't the Beginning Navaid so far...) we started the loop again, keep the searching...  at the next Airway sequence with the same name (Example: A,UZ14,9 - A,UZ14,39)
+					pos = line.find(seekAirway);
+					if (pos != std::string::npos) {
+						// Searched Airway found
+						readingAirway = true;
+						std::vector<string> splittedLine = splitStringBy(line);
+						airway.id = splittedLine.at(1);
+						airway.sequence = splittedLine.at(2);
+					}
+					else {
+						// End of an Airway and the next found it is not the Airway searched (We didn't find what we are searching)
+						readingAirway = false;
+					}
+				}
+				else {
+					// End of an Airway that we only find the Start Navaid, not the End Navaid, so keep looking... 
+					readingAirway = false;
+					foundBegNavaid = false;
+					foundEndNavaid = false;
 				}
 			}
 			else if (readingAirway) {
-				// Already found the Airway and reading its Navaid's lines
 				if (foundBegNavaid) {
-					airwayNavaid_t navaid;
-					std::vector<string> splittedLine = splitStringBy(line);
-					navaid.id = splittedLine.at(1);
-					navaid.latitude = atof(splittedLine.at(2).c_str());
-					navaid.longitude = atof(splittedLine.at(3).c_str());
-					airway.navaids.push_back(navaid);
-
-					// Check if this is the End Navaid Searched
-					pos = line.find(seekEndNavaid);
-					if (pos != std::string::npos)
-					{
-						foundEndNavaid = true;
+					// In case there's a Navaid Start to read, just read after found that Navaid Start
+					convertLineToNavaidAddToAirway(line, &airway);
+					// Check if this is the End Navaid Searched, IF informed at the entry paramater an End Navaid to stop reading, otherwise let's go until finish this Airway
+					if (!strEndNavaid.empty()) {
+						pos = line.find(seekEndNavaid);
+						if (pos != std::string::npos)
+						{
+							foundEndNavaid = true;
+							break;
+						}
 					}
 				}
 				else {
 					pos = line.find(seekBegNavaid);
 					if (pos != std::string::npos)
 					{
+						// Reset airway vector (not what we looking for), in case filled with a wrong segment where only the Beginning Navaid were found
+						airway.navaids.clear();
 						foundBegNavaid = true;
-						airwayNavaid_t navaid;
-						std::vector<string> splittedLine = splitStringBy(line);
-						navaid.id = splittedLine.at(1);
-						navaid.latitude = atof(splittedLine.at(2).c_str());
-						navaid.longitude = atof(splittedLine.at(3).c_str());
-						airway.navaids.push_back(navaid);
+						convertLineToNavaidAddToAirway(line, &airway);
 					}
 				}
 			}

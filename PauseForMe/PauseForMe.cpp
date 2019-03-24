@@ -42,6 +42,7 @@
 #pragma warning(disable: 4996)
 #pragma warning(disable: 4244)
 #pragma warning(disable: 4267)
+#pragma warning(disable: 4312)
 
 #include "SocketServer.h"
 #include <websocketpp/config/asio_no_tls.hpp>
@@ -151,7 +152,7 @@ static XPWidgetID wCaptionNavaidDMEDesc;
 static XPWidgetID wTextNavaidDMEDistanceMin;
 static XPWidgetID wDataRef1, wDataRef2, wDataRef3, wDataRefValue1, wDataRefValue2, wDataRefValue3;
 static XPWidgetID wChkDataRef1, wChkDataRef2, wChkDataRef3;
-static XPWidgetID wCaptionDataRef1, wCaptionDataRef2, wCaptionDataRef3, wTextFlightPlan, wTextTime, wChkTime, wBtnFpTranslate, wBtnFpBringBackOriginal;
+static XPWidgetID wCaptionDataRef1, wCaptionDataRef2, wCaptionDataRef3, wTextFlightPlan, wTextTime, wChkTime, wBtnFpTranslate, wBtnFpBringBackOriginal,wBtnPasteFlightPlan, wBtnCopyFlightPlan, wBtnCleanFlightPlan, wBtnSendFlightPlan;
 
 int isDataRef1Selected, isDataRef2Selected, isDataRef3Selected;
 
@@ -258,9 +259,12 @@ std::string fileName = "PauseForMe.ini";
 std::string timePause = "";
 int isTimePauseSelected = 0;
 std::string flightPlan = "";
+std::string flightPlanBringBack = "";
 int hourTimeZ;
 int minuTimeZ;
-int versionFlightPlan = -1;
+std::string pathATSFile;
+static std::string supposedPathATSFile = "Custom Data/GNS430/navdata/ATS.txt";
+std::list<NavaidManager::airwayNavaid_t> listTranslatedFlightPlan;
 
 Coordenada objCurrentLongitude(2), objCurrentLatitude(2), objUserLongitude(2), objUserLatitude(2);
 int acceptableDifference = 2;
@@ -298,6 +302,12 @@ void sendMessageSocketClients(std::string msg);
 void translateFlightPlan();
 void bringBackMyFlightPlan();
 std::string writeDownFlightPlan();
+void getPathATSFile();
+bool XSBGetTextFromClipboard(std::string& outText);
+bool XSBSetTextToClipboard(const std::string& inText);
+void pasteFlightPlan();
+void copyFlightPlan();
+void cleanFlightPlan();
 
 XPLMCommandRef SetupOnCommand = NULL;
 XPLMCommandRef SetupOffCommand = NULL;
@@ -1076,13 +1086,21 @@ void CreateWidgetWindow()
 	int fpX = x + 43;
 	int fpY = topY + 17;
 	XPCreateWidget(fpX-3, fpY - 51, fpX + 50, fpY - 61, 1, "Flight Plan:", 0, wMainWindow, xpWidgetClass_Caption);
-	wTextFlightPlan = XPCreateWidget(fpX, fpY - 65, fpX + 550, fpY - 85, 1, flightPlan.c_str(), 0, wMainWindow, xpWidgetClass_TextField);
+	wTextFlightPlan = XPCreateWidget(fpX, fpY - 65, fpX + 500, fpY - 85, 1, flightPlan.c_str(), 0, wMainWindow, xpWidgetClass_TextField);
 	XPSetWidgetProperty(wTextFlightPlan, xpProperty_TextFieldType, xpTextEntryField);
-	XPSetWidgetProperty(wTextFlightPlan, xpProperty_MaxCharacters, 200);
+	XPSetWidgetProperty(wTextFlightPlan, xpProperty_MaxCharacters, 8000);
+	wBtnSendFlightPlan = XPCreateWidget(fpX + 502, fpY - 65, fpX + 552, fpY - 85, 1, " Send ", 0, wMainWindow, xpWidgetClass_Button);
+	XPSetWidgetProperty(wBtnSendFlightPlan, xpProperty_ButtonType, xpPushButton);
 	wBtnFpTranslate = XPCreateWidget(fpX, fpY - 87, fpX + 124, fpY - 97, 1, "Translate Flight Plan", 0, wMainWindow, xpWidgetClass_Button);
 	XPSetWidgetProperty(wBtnFpTranslate, xpProperty_ButtonType, xpPushButton);
-	wBtnFpBringBackOriginal = XPCreateWidget(fpX + 126, fpY - 87, fpX + 246, fpY - 97, 1, "Bring Back my Plan", 0, wMainWindow, xpWidgetClass_Button);
+	wBtnFpBringBackOriginal = XPCreateWidget(fpX + 126, fpY - 87, fpX + 246, fpY - 97, 1, "Bring Back My Plan", 0, wMainWindow, xpWidgetClass_Button);
 	XPSetWidgetProperty(wBtnFpBringBackOriginal, xpProperty_ButtonType, xpPushButton);
+	wBtnCopyFlightPlan = XPCreateWidget(fpX + 248, fpY - 87, fpX + 348, fpY - 97, 1, "Copy", 0, wMainWindow, xpWidgetClass_Button);
+	XPSetWidgetProperty(wBtnCopyFlightPlan, xpProperty_ButtonType, xpPushButton);
+	wBtnPasteFlightPlan = XPCreateWidget(fpX + 350, fpY - 87, fpX + 450, fpY - 97, 1, "Paste", 0, wMainWindow, xpWidgetClass_Button);
+	XPSetWidgetProperty(wBtnPasteFlightPlan, xpProperty_ButtonType, xpPushButton);
+	wBtnCleanFlightPlan = XPCreateWidget(fpX + 452, fpY - 87, fpX + 552, fpY - 97, 1, "Clean", 0, wMainWindow, xpWidgetClass_Button);
+	XPSetWidgetProperty(wBtnCleanFlightPlan, xpProperty_ButtonType, xpPushButton);
 
 	//*********************************************************************************************************************************
 
@@ -1208,6 +1226,8 @@ void saveFileValues()
 	fileIniWriter << "timePause=" + timePause + "\n";
 	fileIniWriter << "flightPlan=" + flightPlan + "\n";
 
+	fileIniWriter << "ats_txt=" + pathATSFile + "\n";
+
 	fileIniWriter.close();
 }
 
@@ -1327,19 +1347,9 @@ int widgetWidgetHandler(XPWidgetMessage			inMessage,
 			timePause = buffer;
 
 			// Flight Plan
-			XPGetWidgetDescriptor(wTextFlightPlan, buffer, sizeof(buffer));
-			std::string fp = buffer;
-			if (fp.compare(flightPlan) != 0) {
-				versionFlightPlan++;
-			}
-			flightPlan = buffer;
-
-			// Send Flight Plan if the Transmitter is OPEN
-			std::string jsonFP = writeDownFlightPlan();
-			log(jsonFP);
-			if (serverSocketStarted) {
-				socketServer->broadcast(jsonFP);
-			}
+			char bufFp[3070];
+			XPGetWidgetDescriptor(wTextFlightPlan, bufFp, sizeof(bufFp));
+			flightPlan = bufFp;
 
 			saveFileValues();
 			return 1;
@@ -1375,6 +1385,30 @@ int widgetWidgetHandler(XPWidgetMessage			inMessage,
 		{
 			bringBackMyFlightPlan();
 			return 1;
+		}
+		if (inParam1 == (intptr_t)wBtnPasteFlightPlan)
+		{
+			pasteFlightPlan();
+			return 1;
+		}
+		if (inParam1 == (intptr_t)wBtnCopyFlightPlan)
+		{
+			copyFlightPlan();
+			return 1;
+		}
+		if (inParam1 == (intptr_t)wBtnCleanFlightPlan)
+		{
+			cleanFlightPlan();
+			return 1;
+		}
+		if (inParam1 == (intptr_t)wBtnSendFlightPlan) {
+			// Send Flight Plan if the Transmitter is OPEN
+			translateFlightPlan();
+			std::string jsonFP = writeDownFlightPlan();
+			log(jsonFP);
+			if (serverSocketStarted) {
+				socketServer->broadcast(jsonFP);
+			}
 		}
 	}
 
@@ -2014,7 +2048,6 @@ float pauseXPlane() {
 				result              = 1;
 				isTimePauseSelected = 0;
 				wChkToUnSelect = wChkTime;
-				
 			}
 		}
 	}
@@ -2636,8 +2669,19 @@ void checkPreferenceFile() {
 			else
 			if (strcmp(param.c_str(), "flightPlan") == 0) {
 				flightPlan = value.c_str();
+				flightPlanBringBack = flightPlan;
+			}
+			else
+			if (strcmp(param.c_str(), "ats_txt") == 0) {
+				pathATSFile = value.c_str();
 			}
 		}
+
+		// Check if the CFG file already has the ATS Path File, otherwise lets create it here to be saved later
+		if (pathATSFile.empty()) {
+			getPathATSFile();
+		}
+
 		fileIniReader.close();
 	} else {
 		fileIniReader.close();
@@ -2682,7 +2726,13 @@ void checkPreferenceFile() {
 		fileIniWriter << "dataRef1=sim/cockpit/electrical/battery_on\n";
 		fileIniWriter << "dataRefValue1=0\n";
 
+		fileIniWriter << "flightPlan=LEBL SLL GIR PPG LFPG\n";
 		fileIniWriter << "timePause=22:10\n";
+
+		getPathATSFile();
+		fileIniWriter << "ats_txt=" << pathATSFile << "\n";
+
+		flightPlanBringBack = "LEBL SLL GIR PPG LFPG";
 
 		fileIniWriter.close();
 	}
@@ -2825,35 +2875,31 @@ void startSocketServer() {
 std::string writeDownFlightPlan() {
 	std::ostringstream oss;
 	oss << "{ \"flightPlan\": {";
-
-	oss << "  \"version\":" << versionFlightPlan << ",";
 	oss << "  \"waypoints\":[";
 
-	// Building the Flight Plan
-	float myCurrentLatitude = XPLMGetDataf(XPLMFindDataRef("sim/flightmodel/position/latitude"));
-	float myCurrentLongitude = XPLMGetDataf(XPLMFindDataRef("sim/flightmodel/position/longitude"));
-	char buffer[200];
-	XPGetWidgetDescriptor(wTextFlightPlan, buffer, sizeof(buffer));
+	// Start looking the Navaid most close to coordinates that my Plane is localized
+	float currentLatitude = XPLMGetDataf(XPLMFindDataRef("sim/flightmodel/position/latitude"));
+	float currentLongitude = XPLMGetDataf(XPLMFindDataRef("sim/flightmodel/position/longitude"));
+
 	int index = 0;
-	std::string text = buffer;
-	std::istringstream iss(text);
-	std::vector<std::string> results((std::istream_iterator<std::string>(iss)), std::istream_iterator<std::string>());
-	for (std::vector<string>::iterator it = results.begin(); it != results.end(); it++) {
-		std::string navId = *it;
-		boost::to_upper(navId);
+	std::list<NavaidManager::airwayNavaid_t>::iterator itAirwaysTranslated = listTranslatedFlightPlan.begin();
+	while (itAirwaysTranslated != listTranslatedFlightPlan.end()) {
+		struct NavaidManager::airwayNavaid_t structNavaid = *itAirwaysTranslated;
+		std::string navId = structNavaid.id;
+
 
 		XPLMNavRef navRef;
 		if (navId.length() == 3) {
-			navRef = XPLMFindNavAid(NULL, navId.c_str(), &myCurrentLatitude, &myCurrentLongitude, NULL, xplm_Nav_NDB | xplm_Nav_VOR | xplm_Nav_ILS | xplm_Nav_Localizer );
+			navRef = XPLMFindNavAid(NULL, navId.c_str(), &currentLatitude, &currentLongitude, NULL, xplm_Nav_NDB | xplm_Nav_VOR );
 		} else
 		if (navId.length() == 4) {
-			navRef = XPLMFindNavAid(NULL, navId.c_str(), &myCurrentLatitude, &myCurrentLongitude, NULL, xplm_Nav_Airport);
+			navRef = XPLMFindNavAid(NULL, navId.c_str(), &currentLatitude, &currentLongitude, NULL, xplm_Nav_Airport);
 		} else
 		if (navId.length() == 5) {
-			navRef = XPLMFindNavAid(NULL, navId.c_str(), &myCurrentLatitude, &myCurrentLongitude, NULL, xplm_Nav_Fix);
+			navRef = XPLMFindNavAid(NULL, navId.c_str(), &currentLatitude, &currentLongitude, NULL, xplm_Nav_Fix);
 		}
 		else {
-			navRef = XPLMFindNavAid(NULL, navId.c_str(), &myCurrentLatitude, &myCurrentLongitude, NULL, xplm_Nav_Unknown | xplm_Nav_Airport | xplm_Nav_NDB | xplm_Nav_VOR | xplm_Nav_ILS 
+			navRef = XPLMFindNavAid(NULL, navId.c_str(), &currentLatitude, &currentLongitude, NULL, xplm_Nav_Unknown | xplm_Nav_Airport | xplm_Nav_NDB | xplm_Nav_VOR | xplm_Nav_ILS
 				| xplm_Nav_Localizer | xplm_Nav_GlideSlope | xplm_Nav_OuterMarker | xplm_Nav_MiddleMarker | xplm_Nav_InnerMarker | xplm_Nav_Fix | xplm_Nav_DME | xplm_Nav_LatLon );
 		}
 
@@ -2864,26 +2910,34 @@ std::string writeDownFlightPlan() {
 		float outLongitude;
 		float outHeading;
 		XPLMNavType outType;
-		
+
 		XPLMGetNavAidInfo(navRef, &outType, &outLatitude, &outLongitude, NULL, &outFrequency, &outHeading, outID, outName, NULL);
 		if (strcmp(outID, "----") != 0) {
 			index++;
 			if (index > 1) {
-		        oss << "       ,";
+				oss << "       ,";
 			}
 			oss << "      {";
-			oss << "        \"version\":" << index << ",";
+			oss << "        \"index\":" << index << ",";
 			oss << "        \"id\":\"" << outID << "\",";
 			oss << "        \"name\":\"" << outName << "\",";
+			//oss << "        \"latitude\":\"" << structNavaid.latitude << "\",";
+			//oss << "        \"longitude\":\"" << structNavaid.longitude << "\",";
 			oss << "        \"latitude\":\"" << outLatitude << "\",";
 			oss << "        \"longitude\":\"" << outLongitude << "\",";
 			oss << "        \"type\":\"" << getDescriptionGPSDestinationType(outType) << "\"";
 			oss << "      }";
+
+			// Looking the next Navaid according with the last navaid localization (proximity)
+			currentLatitude = outLatitude;
+			currentLongitude = outLongitude;
 		}
 		else {
 			log(navId + " Not Found at Flight Plan Search");
 		}
 
+		itAirwaysTranslated++;
+		index++;
 	}
 	oss << "    ]";
 	oss << "}}";
@@ -2891,12 +2945,14 @@ std::string writeDownFlightPlan() {
 }
 
 void translateFlightPlan() {
-	char buffer[200];
+	listTranslatedFlightPlan.clear();
+
+	char buffer[3072];
 	XPGetWidgetDescriptor(wTextFlightPlan, buffer, sizeof(buffer));
 	std::string text = buffer;
 	std::istringstream iss(text);
-	std::list<string> listTranslatedFp;
 
+	struct NavaidManager::airwayNavaid_t structNavaid;
 	int index = 0;
 	std::string navIdBefore;
 	std::string navIdAfter;
@@ -2918,15 +2974,17 @@ void translateFlightPlan() {
 			navIdAfter  = results.at(index + 1);
 
 			// Localize (check if this is a Airway) the Airway with the parameters
-			NavaidManager::airway_t airway = navManager.readingAirway("c:/X-Plane 11/Custom Data/GNS430/navdata/ATS.txt", navId, navIdBefore, navIdAfter);
+			// pathATSFile (supposedly = "c:/X-Plane 11/Custom Data/GNS430/navdata/ATS.txt")
+			NavaidManager::airway_t airway = navManager.readingAirway(pathATSFile, navId, navIdBefore, navIdAfter);
 			if (!airway.id.empty() && !airway.navaids.empty() && airway.navaids.size() > 0) {
 				// Airway identified (found)
 				// Remove the last one inserted , because it will be present on the first occurence of the Airway
-				listTranslatedFp.pop_back();
+				listTranslatedFlightPlan.pop_back();
 
 				// Iterate over all the its returned Navaids 
 				std::list<NavaidManager::airwayNavaid_t>::iterator itAirways = airway.navaids.begin();
-				int indexAirwayNavaids = 0;
+				int indexAirwayNavaids       = 0;
+				std::string lastNavaidAirway = "";
 				while (itAirways != airway.navaids.end()) {
 					NavaidManager::airwayNavaid_t navaid = *itAirways;
 					indexAirwayNavaids++;
@@ -2938,41 +2996,166 @@ void translateFlightPlan() {
 
 					itAirways++;
 					// Add all the new Navaids in between (Start-End) from the Airway
-					listTranslatedFp.push_back(navaid.id);
+					listTranslatedFlightPlan.push_back(navaid);
+					// save the last navaid.id of the Airways list
+					lastNavaidAirway = navaid.id;
 				}
 				if (indexAirwayNavaids > 0) {
 					// Remove the last one inserted from the Airway section, because it will be present on the next occurence of this FlightPlan as the End Marker of the Airway we just read
-					listTranslatedFp.pop_back();
+					// Check (just in case) if the index+1 does not overflow the size of the results
+					if ((index + 1) < results.size()) {
+						std::string nextNavaidOnFlightPlan = results.at(index + 1);
+						// Check if the next Navaid on the FlightPlan is equal of the last one of the Airway list, if this is TRUE, we remove one in order to not duplicate them
+						if (strcmp(nextNavaidOnFlightPlan.c_str(), lastNavaidAirway.c_str()) == 0) {
+							listTranslatedFlightPlan.pop_back();
+						}
+					}
 				}
 			}
 			else {
 				//log(navId + " Is Not an Airway (ignoring..)");
-				listTranslatedFp.push_back(navId);
+				structNavaid.id = navId;
+				structNavaid.longitude = 0;
+				structNavaid.latitude = 0;
+				listTranslatedFlightPlan.push_back(structNavaid);
 			}
 		}
 		else {
-			listTranslatedFp.push_back(navId);
+			structNavaid.id = navId;
+			structNavaid.longitude = 0;
+			structNavaid.latitude = 0;
+			listTranslatedFlightPlan.push_back(structNavaid);
 		}
 		index++;
 	}
 
 	index = 0;
 	std::ostringstream newFlightPlan;
-	std::list<string>::iterator itAirwaysTranslated = listTranslatedFp.begin();
-	while (itAirwaysTranslated != listTranslatedFp.end()) {
+	std::list<NavaidManager::airwayNavaid_t>::iterator itAirwaysTranslated = listTranslatedFlightPlan.begin();
+	while (itAirwaysTranslated != listTranslatedFlightPlan.end()) {
+		struct NavaidManager::airwayNavaid_t navaid = *itAirwaysTranslated;
 		if (index > 0) {
-			newFlightPlan << " " << *itAirwaysTranslated;
+			// Remove SID and STAR, if exists
+			if ((strcmp(navaid.id.c_str(), "SID") != 0) && (strcmp(navaid.id.c_str(), "STAR") != 0)) {
+				newFlightPlan << " " << navaid.id;
+			}
 		}
 		else {
-			newFlightPlan << *itAirwaysTranslated;
+			newFlightPlan << navaid.id;
 		}
 		itAirwaysTranslated++;
 		index++;
 	}
-	//log(newFlightPlan.str());
 	XPSetWidgetDescriptor(wTextFlightPlan, newFlightPlan.str().c_str());
 }
 
 void bringBackMyFlightPlan() {
-	XPSetWidgetDescriptor(wTextFlightPlan, flightPlan.c_str());
+	XPSetWidgetDescriptor(wTextFlightPlan, flightPlanBringBack.c_str());
+}
+
+void pasteFlightPlan() {
+	std::string fromClipboard;
+	XSBGetTextFromClipboard(fromClipboard);
+	XPSetWidgetDescriptor(wTextFlightPlan, fromClipboard.c_str());
+}
+
+void copyFlightPlan() {
+	char buffer[3072];
+	XPGetWidgetDescriptor(wTextFlightPlan, buffer, sizeof(buffer));
+	std::string toClipboard = buffer;
+	XSBSetTextToClipboard(toClipboard);
+}
+
+void cleanFlightPlan() {
+	XPSetWidgetDescriptor(wTextFlightPlan, "");
+	flightPlan = "";
+}
+
+void getPathATSFile() {
+	// Writing the supposed path of the ATS.txt  file - For Airways Translation
+	char buffer[256];
+	XPLMGetSystemPath(buffer);
+	pathATSFile = buffer;
+	pathATSFile += supposedPathATSFile;
+	replaceAll(pathATSFile, "\\", "/", 0);
+}
+
+bool XSBGetTextFromClipboard(std::string& outText) {
+	#if IBM
+		HGLOBAL   	hglb;
+		LPTSTR    	lptstr;
+		bool		retVal = false;
+		static XPLMDataRef hwndDataRef = XPLMFindDataRef("sim/operation/windows/system_window");
+		HWND hwndMain = (HWND)XPLMGetDatai(hwndDataRef);
+
+		if (!IsClipboardFormatAvailable(CF_TEXT))
+			return false;
+
+		if (!OpenClipboard(hwndMain))
+			return false;
+
+		hglb = GetClipboardData(CF_TEXT);
+		if (hglb != NULL)
+		{
+			lptstr = (LPSTR)GlobalLock(hglb);
+			if (lptstr != NULL)
+			{
+				outText = lptstr;
+				GlobalUnlock(hglb);
+				retVal = true;
+			}
+		}
+		CloseClipboard();
+		return retVal;
+	#endif
+
+	#if APL
+		ScrapRef	scrap;
+		if (::GetCurrentScrap(&scrap) != noErr)
+			return false;
+
+		SInt32		byteCount = 0;
+		OSStatus	status = ::GetScrapFlavorSize(scrap, kScrapFlavorTypeText, &byteCount);
+		if (status != noErr)
+			return false;
+
+		outText.resize(byteCount);
+
+		return (::GetScrapFlavorData(scrap, kScrapFlavorTypeText, &byteCount, &*outText.begin()) == noErr);
+	#endif
+}
+
+bool XSBSetTextToClipboard(const std::string& inText) {
+	#if IBM
+		LPTSTR  lptstrCopy;
+		HGLOBAL hglbCopy;
+		static XPLMDataRef hwndDataRef = XPLMFindDataRef("sim/operation/windows/system_window");
+		HWND hwndMain = (HWND)XPLMGetDatai(hwndDataRef);
+
+		if (!OpenClipboard(hwndMain))
+			return false;
+		EmptyClipboard();
+
+		hglbCopy = GlobalAlloc(GMEM_MOVEABLE, sizeof(TCHAR) * (inText.length() + 1));
+		if (hglbCopy == NULL)
+		{
+			CloseClipboard();
+			return false;
+		}
+
+		lptstrCopy = (LPSTR)GlobalLock(hglbCopy);
+		strcpy(lptstrCopy, inText.c_str());
+		GlobalUnlock(hglbCopy);
+
+		SetClipboardData(CF_TEXT, hglbCopy);
+		CloseClipboard();
+		return true;
+	#endif
+
+	#if APL
+		ScrapRef	scrap;
+		if (::ClearCurrentScrap() != noErr) return false;
+		if (::GetCurrentScrap(&scrap) != noErr) return false;
+		return ::PutScrapFlavor(scrap, kScrapFlavorTypeText, kScrapFlavorMaskNone, inText.size(), &*inText.begin()) == noErr;
+	#endif
 }
