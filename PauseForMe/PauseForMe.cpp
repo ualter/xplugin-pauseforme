@@ -284,6 +284,16 @@ float CallBackXPlaneSocketServer(float  inElapsedSinceLastCall,
 	void * inRefcon);
 static void PauseForMeMenuHandler(void *, void *);
 
+struct CommandConfigPause {
+	std::string command;
+	std::string navaid;
+	std::string type;
+	std::string distance;
+};
+
+std::vector<string> splitStringBy(std::string line, std::string delimiter);
+CommandConfigPause interpretCommandConfigPause(std::string line);
+
 void hideWindowPaused();
 void checkPreferenceFile();
 void log(std::string s);
@@ -1405,7 +1415,6 @@ int widgetWidgetHandler(XPWidgetMessage			inMessage,
 			// Send Flight Plan if the Transmitter is OPEN
 			translateFlightPlan();
 			std::string jsonFP = writeDownFlightPlan();
-			log(jsonFP);
 			if (serverSocketStarted) {
 				socketServer->broadcast(jsonFP);
 			}
@@ -2093,7 +2102,7 @@ int checkDataRefs(int number) {
 	std::string signal                 = "";
 	std::string realDataRefValueStr    = "";
 	std::string wishedDataRefValueStr  = "";
-	// Float or Int (if there's a point, so...  it is a Float value, otherwise it will be treated as a Integer)
+	// Float or Int (if there's a decimal point, so...  it is a Float value, otherwise it will be treated as a Integer)
 	if (s.find('.') != std::string::npos) {
 		float realDataRefValue   = XPLMGetDataf(XPLMFindDataRef(b1));
 		float wishedDataRefValue = 0;
@@ -2331,6 +2340,60 @@ float CallBackXPlane(float  inElapsedSinceLastCall,
 					AlertWindowShown = 0;
 				}
 			} else 
+			if (callBackHandler->getCommand().rfind("{CONFIG_PAUSE_NAVAID}", 0) == 0) {
+				log("Received CHANGE config pause value " + identification + ", Command: " + callBackHandler->getCommand());
+				CommandConfigPause command = interpretCommandConfigPause(callBackHandler->getCommand());
+
+				int found = 0;
+				XPWidgetID textId;
+				XPWidgetID textDistanceMin;
+				XPWidgetID wChk;
+
+				if (command.type.compare("Airport") == 0) {
+					textId                    = wTextNavaidAirportID;
+					textDistanceMin           = wTextNavaidAirportDistanceMin;
+					wChk                      = wChkNavaidAirport;
+					userNavaidAirportDistance = atoi(command.distance.c_str());
+					isNavaidAirportSelected   = 1;
+					found                     = 1;
+				} else
+				if (command.type.compare("VOR") == 0) {
+					textId                = wTextNavaidVORID;
+					textDistanceMin       = wTextNavaidVORDistanceMin;
+					wChk                  = wChkNavaidVOR;
+					userNavaidVORDistance = atoi(command.distance.c_str());
+					isNavaidVORSelected   = 1;
+					found                 = 1;
+				} else
+				if (command.type.compare("NDB") == 0) {
+					textId                = wTextNavaidNDBID;
+					textDistanceMin       = wTextNavaidNDBDistanceMin;
+					wChk                  = wChkNavaidNDB;
+					userNavaidNDBDistance = atoi(command.distance.c_str());
+					isNavaidNDBSelected   = 1;
+					found                 = 1;
+				} else
+				if (command.type.compare("FIX") == 0) {
+					textId                = wTextNavaidFixID;
+					textDistanceMin       = wTextNavaidFixDistanceMin;
+					wChk                  = wChkNavaidFix;
+					userNavaidFixDistance = atoi(command.distance.c_str());
+					isNavaidFixSelected   = 1;
+					found                 = 1;
+				}
+				
+				if (found == 1) {
+					XPSetWidgetDescriptor(textId, command.navaid.c_str());
+					XPSetWidgetDescriptor(textDistanceMin, command.distance.c_str());
+					XPSetWidgetProperty(wChk, xpProperty_ButtonState, 1);
+					saveFileValues();
+				}
+				else {
+					log("Ops... Not found the type " + command.type + " for Config Pause Navaid App");
+				}
+				callBackHandler->commandExecuted();
+			}
+			else
 			if (callBackHandler->getCommand().rfind("{CLOSE}", 0) == 0) {
 				log("Received CLOSED request by " + identification);
 				callBackHandler->commandExecuted();
@@ -2445,6 +2508,19 @@ float CallBackXPlaneSocketServer(float  inElapsedSinceLastCall,
 			oss << "             ,\"userFixDistance\":" << userNavaidFixDistance;
 			oss << "             ,\"userDMEDistance\":" << userNavaidDMEDistance;
 			oss << "           }";
+			oss << "        ,\"timePause\":\"" << timePause << "\"";
+			oss << "        ,\"altitude\":";
+			oss << "           {";
+			oss << "              \"min\":" << userAltitudeMin;
+			oss << "             ,\"max\":" << userAltitudeMax;
+			oss << "             ,\"selected\":" << isAltitudeSelected;
+			oss << "           }";
+			oss << "        ,\"speed\":";
+			oss << "           {";
+			oss << "              \"min\":" << userAirspeedMin;
+			oss << "             ,\"max\":" << userAirspeedMax;
+			oss << "             ,\"selected\":" << isAirspeedSelected;
+			oss << "           }";
 			oss << "       }";
 			oss << "    ,\"nextDestination\":";
 			oss << "       {";
@@ -2476,6 +2552,8 @@ float CallBackXPlaneSocketServer(float  inElapsedSinceLastCall,
 			oss << "  ,\"isPaused\":" << std::to_string(isGamePaused);
 			oss << "  ,\"isBatteryOn\":" << std::to_string(isBatteryOn);
 			oss << "}";
+
+			//log(oss.str());
 			socketServer->broadcast(oss.str());
 		}
 	}
@@ -3158,4 +3236,40 @@ bool XSBSetTextToClipboard(const std::string& inText) {
 		if (::GetCurrentScrap(&scrap) != noErr) return false;
 		return ::PutScrapFlavor(scrap, kScrapFlavorTypeText, kScrapFlavorMaskNone, inText.size(), &*inText.begin()) == noErr;
 	#endif
+}
+
+std::vector<string> splitStringBy(std::string line, std::string delimiter) {
+	std::vector<std::string> words;
+	size_t pos = 0;
+	std::string token;
+	while ((pos = line.find(delimiter)) != std::string::npos) {
+		token = line.substr(0, pos);
+		words.push_back(token);
+		line.erase(0, pos + delimiter.length());
+	}
+	words.push_back(line);
+	return words;
+}
+
+CommandConfigPause interpretCommandConfigPause(std::string line) {
+	std::vector<string> words = splitStringBy(line, "|");
+	std::vector<string>::iterator it;
+	std::string navaid, type, distance;
+	CommandConfigPause command;
+	int i = 0;
+	for (it = words.begin(); it != words.end(); it++, i++) {
+		std::string word = *it;
+		if (i == 1) {
+			command.navaid = word;
+		}
+		else
+			if (i == 2) {
+				command.type = word;
+			}
+			else
+				if (i == 3) {
+					command.distance = word;
+				}
+	}
+	return command;
 }
