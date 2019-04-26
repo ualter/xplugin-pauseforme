@@ -284,15 +284,30 @@ float CallBackXPlaneSocketServer(float  inElapsedSinceLastCall,
 	void * inRefcon);
 static void PauseForMeMenuHandler(void *, void *);
 
-struct CommandConfigPause {
+struct CommandConfigPauseNavaid {
 	std::string command;
 	std::string navaid;
 	std::string type;
 	std::string distance;
 };
 
+// For Altitude or Airspeed
+struct CommandConfigPauseLowerUpper {
+	std::string command;
+	std::string parameter;
+	std::string lower;
+	std::string upper;
+};
+
+struct CommandConfigPauseTime {
+	std::string command;
+	std::string time;
+};
+
 std::vector<string> splitStringBy(std::string line, std::string delimiter);
-CommandConfigPause interpretCommandConfigPause(std::string line);
+CommandConfigPauseNavaid interpretCommandConfigPauseNavaId(std::string line);
+CommandConfigPauseLowerUpper interpretCommandConfigPauseLowerUpper(std::string line);
+CommandConfigPauseTime        interpretCommandConfigPauseTime(std::string line);
 
 void hideWindowPaused();
 void checkPreferenceFile();
@@ -2342,7 +2357,7 @@ float CallBackXPlane(float  inElapsedSinceLastCall,
 			} else 
 			if (callBackHandler->getCommand().rfind("{CONFIG_PAUSE_NAVAID}", 0) == 0) {
 				log("Received CHANGE config pause value " + identification + ", Command: " + callBackHandler->getCommand());
-				CommandConfigPause command = interpretCommandConfigPause(callBackHandler->getCommand());
+				CommandConfigPauseNavaid command = interpretCommandConfigPauseNavaId(callBackHandler->getCommand());
 
 				int found = 0;
 				XPWidgetID textId;
@@ -2380,6 +2395,14 @@ float CallBackXPlane(float  inElapsedSinceLastCall,
 					userNavaidFixDistance = atoi(command.distance.c_str());
 					isNavaidFixSelected   = 1;
 					found                 = 1;
+				} else
+				if (command.type.compare("DME") == 0) {
+					textId                = wTextNavaidDMEID;
+					textDistanceMin       = wTextNavaidDMEDistanceMin;
+					wChk                  = wChkNavaidDME;
+					userNavaidDMEDistance = atoi(command.distance.c_str());
+					isNavaidDMESelected   = 1;
+					found = 1;
 				}
 				
 				if (found == 1) {
@@ -2397,6 +2420,60 @@ float CallBackXPlane(float  inElapsedSinceLastCall,
 			if (callBackHandler->getCommand().rfind("{CLOSE}", 0) == 0) {
 				log("Received CLOSED request by " + identification);
 				callBackHandler->commandExecuted();
+			} else
+			if (callBackHandler->getCommand().rfind("{CONFIG_PAUSE_ALTITUDE}", 0) == 0 ||
+				callBackHandler->getCommand().rfind("{CONFIG_PAUSE_AIRSPEED}", 0) == 0) {
+				log("Received CHANGE config pause value " + identification + ", Command: " + callBackHandler->getCommand());
+				CommandConfigPauseLowerUpper command = interpretCommandConfigPauseLowerUpper(callBackHandler->getCommand());
+
+				XPWidgetID textLower;
+				XPWidgetID textUpper;
+				XPWidgetID wChk;
+				int found = 0;
+				if (command.command.compare("{CONFIG_PAUSE_ALTITUDE}") == 0) {
+					textLower          = wTextAltitudeMin;
+					textUpper          = wTextAltitudeMax;
+					isAltitudeSelected = 1;
+					userAltitudeMin    = atoi(command.lower.c_str());
+					userAltitudeMax    = atoi(command.upper.c_str());
+					wChk               = wChkAltitude;
+					found = 1;
+				}
+				else 
+				if (command.command.compare("{CONFIG_PAUSE_AIRSPEED}") == 0) {
+					textLower          = wTextAirspeedMin;
+					textUpper          = wTextAirspeedMax;
+					isAirspeedSelected = 1;
+					userAirspeedMin    = atoi(command.lower.c_str());
+					userAirspeedMax    = atoi(command.upper.c_str());
+					wChk               = wChkAirspeed;
+					found = 1;
+				}
+
+				if (found) {
+					XPSetWidgetDescriptor(textLower, command.lower.c_str());
+					XPSetWidgetDescriptor(textUpper, command.upper.c_str());
+					XPSetWidgetProperty(wChk, xpProperty_ButtonState, 1);
+					saveFileValues();
+				}
+				else {
+					log("Ops... Not found the command " + command.command + " for Config Pause Altitude/Airspeed App");
+				}
+				callBackHandler->commandExecuted();
+			} else 
+			if ( callBackHandler->getCommand().rfind("{CONFIG_PAUSE_TIME}", 0) == 0 ) {
+				log("Received CHANGE config pause value " + identification + ", Command: " + callBackHandler->getCommand());
+				CommandConfigPauseTime command = interpretCommandConfigPauseTime(callBackHandler->getCommand());
+
+				XPSetWidgetDescriptor(wTextTime, command.time.c_str());
+				XPSetWidgetProperty(wChkTime, xpProperty_ButtonState, 1);
+				isTimePauseSelected = 1;
+				timePause           = command.time.c_str();
+				saveFileValues();
+				callBackHandler->commandExecuted();
+			}
+			else {
+				log("Command not recognized: " + callBackHandler->getCommand());
 			}
 		}
 	}
@@ -2507,6 +2584,25 @@ float CallBackXPlaneSocketServer(float  inElapsedSinceLastCall,
 			oss << "             ,\"userNDBDistance\":" << userNavaidNDBDistance;
 			oss << "             ,\"userFixDistance\":" << userNavaidFixDistance;
 			oss << "             ,\"userDMEDistance\":" << userNavaidDMEDistance;
+			oss << "             ,\"config\":";
+			oss << "                {";
+			oss << "                  \"id\":";
+			oss << "                    {";
+			oss << "                       \"airport\":\"" << navaidAirport.id << "\"";
+			oss << "                      ,\"vor\":\"" << navaidVOR.id << "\"";
+			oss << "                      ,\"ndb\":\"" << navaidNDB.id << "\"";
+			oss << "                      ,\"fix\":\"" << navaidFix.id << "\"";
+			oss << "                      ,\"dme\":\"" << navaidDME.id << "\"";
+			oss << "                    }";
+			oss << "                 ,\"distance\":";
+			oss << "                    {";
+			oss << "                       \"airport\":" << navaidAirport.distance;
+			oss << "                      ,\"vor\":"     << navaidVOR.distance;
+			oss << "                      ,\"ndb\":"     << navaidNDB.distance;
+			oss << "                      ,\"fix\":"     << navaidFix.distance;
+			oss << "                      ,\"dme\":"     << navaidDME.distance;
+			oss << "                    }";
+			oss << "                }";
 			oss << "           }";
 			oss << "        ,\"timePause\":\"" << timePause << "\"";
 			oss << "        ,\"altitude\":";
@@ -2548,6 +2644,7 @@ float CallBackXPlaneSocketServer(float  inElapsedSinceLastCall,
 			oss << "             ,\"status\":" << navaidFmsDestination.statusOK;
 			oss << "           }";
 			oss << "       }";
+			oss << "    ,\"time\":\"" << hourTimeZ << ":" << minuTimeZ << "\"";
 			oss << "   }";
 			oss << "  ,\"isPaused\":" << std::to_string(isGamePaused);
 			oss << "  ,\"isBatteryOn\":" << std::to_string(isBatteryOn);
@@ -3251,11 +3348,11 @@ std::vector<string> splitStringBy(std::string line, std::string delimiter) {
 	return words;
 }
 
-CommandConfigPause interpretCommandConfigPause(std::string line) {
+CommandConfigPauseNavaid interpretCommandConfigPauseNavaId(std::string line) {
 	std::vector<string> words = splitStringBy(line, "|");
 	std::vector<string>::iterator it;
 	std::string navaid, type, distance;
-	CommandConfigPause command;
+	CommandConfigPauseNavaid command;
 	int i = 0;
 	for (it = words.begin(); it != words.end(); it++, i++) {
 		std::string word = *it;
@@ -3273,3 +3370,50 @@ CommandConfigPause interpretCommandConfigPause(std::string line) {
 	}
 	return command;
 }
+
+CommandConfigPauseLowerUpper interpretCommandConfigPauseLowerUpper(std::string line) {
+	std::vector<string> words = splitStringBy(line, "|");
+	std::vector<string>::iterator it;
+	std::string navaid, type, distance;
+	CommandConfigPauseLowerUpper command;
+	int i = 0;
+	for (it = words.begin(); it != words.end(); it++, i++) {
+		std::string word = *it;
+		if (i == 0) {
+			command.command = word;
+		}
+		else
+		if (i == 1) {
+			command.parameter = word;
+		}
+		else
+		if (i == 2) {
+			command.lower = word;
+		}
+		else
+		if (i == 3) {
+			command.upper = word;
+		}
+	}
+	return command;
+}
+
+CommandConfigPauseTime interpretCommandConfigPauseTime(std::string line) {
+	std::vector<string> words = splitStringBy(line, "|");
+	std::vector<string>::iterator it;
+	std::string navaid, type, distance;
+	CommandConfigPauseTime command;
+	int i = 0;
+	for (it = words.begin(); it != words.end(); it++, i++) {
+		std::string word = *it;
+		if (i == 0) {
+			command.command = word;
+		}
+		else
+			if (i == 1) {
+				command.time = word;
+			}
+	}
+	return command;
+}
+
