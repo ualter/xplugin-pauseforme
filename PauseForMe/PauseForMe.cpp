@@ -2594,6 +2594,14 @@ float CallBackXPlaneSocketServer(float  inElapsedSinceLastCall,
 			oss << "                      ,\"fix\":\"" << navaidFix.id << "\"";
 			oss << "                      ,\"dme\":\"" << navaidDME.id << "\"";
 			oss << "                    }";
+			oss << "                 ,\"selected\":";
+			oss << "                    {";
+			oss << "                       \"airport\":" << isNavaidAirportSelected;
+			oss << "                      ,\"vor\":" << isNavaidVORSelected;
+			oss << "                      ,\"ndb\":" << isNavaidNDBSelected;
+			oss << "                      ,\"fix\":" << isNavaidFixSelected;
+			oss << "                      ,\"dme\":" << isNavaidDMESelected;
+			oss << "                    }";
 			oss << "                 ,\"distance\":";
 			oss << "                    {";
 			oss << "                       \"airport\":" << navaidAirport.distance;
@@ -2605,6 +2613,7 @@ float CallBackXPlaneSocketServer(float  inElapsedSinceLastCall,
 			oss << "                }";
 			oss << "           }";
 			oss << "        ,\"timePause\":\"" << timePause << "\"";
+			oss << "        ,\"timePauseSelected\":" << isTimePauseSelected;
 			oss << "        ,\"altitude\":";
 			oss << "           {";
 			oss << "              \"min\":" << userAltitudeMin;
