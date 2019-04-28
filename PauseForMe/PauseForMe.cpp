@@ -2660,7 +2660,7 @@ float CallBackXPlaneSocketServer(float  inElapsedSinceLastCall,
 			oss << "             ,\"status\":" << navaidFmsDestination.statusOK;
 			oss << "           }";
 			oss << "       }";
-			oss << "    ,\"time\":\"" << hourTimeZ << ":" << minuTimeZ << "\"";
+			oss << "    ,\"time\":\"" << hourTimeZ << ":" << minuTimeZ << ":" << secoTimeZ << "\"";
 			oss << "   }";
 			oss << "  ,\"isPaused\":" << std::to_string(isGamePaused);
 			oss << "  ,\"isBatteryOn\":" << std::to_string(isBatteryOn);
