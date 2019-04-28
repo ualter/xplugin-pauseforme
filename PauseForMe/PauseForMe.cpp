@@ -152,7 +152,8 @@ static XPWidgetID wCaptionNavaidDMEDesc;
 static XPWidgetID wTextNavaidDMEDistanceMin;
 static XPWidgetID wDataRef1, wDataRef2, wDataRef3, wDataRefValue1, wDataRefValue2, wDataRefValue3;
 static XPWidgetID wChkDataRef1, wChkDataRef2, wChkDataRef3;
-static XPWidgetID wCaptionDataRef1, wCaptionDataRef2, wCaptionDataRef3, wTextFlightPlan, wTextTime, wChkTime, wBtnFpTranslate, wBtnFpBringBackOriginal,wBtnPasteFlightPlan, wBtnCopyFlightPlan, wBtnCleanFlightPlan, wBtnSendFlightPlan;
+static XPWidgetID wCaptionDataRef1, wCaptionDataRef2, wCaptionDataRef3, wTextFlightPlan, wTextTime, wChkTime;
+static XPWidgetID wBtnFpTranslate, wBtnFpBringBackOriginal, wBtnPasteFlightPlan, wBtnCopyFlightPlan, wBtnCleanFlightPlan, wBtnSendFlightPlan, wCaptionTime;
 
 int isDataRef1Selected, isDataRef2Selected, isDataRef3Selected;
 
@@ -262,6 +263,7 @@ std::string flightPlan = "";
 std::string flightPlanBringBack = "";
 int hourTimeZ;
 int minuTimeZ;
+int secoTimeZ;
 std::string pathATSFile;
 static std::string supposedPathATSFile = "Custom Data/GNS430/navdata/ATS.txt";
 std::list<NavaidManager::airwayNavaid_t> listTranslatedFlightPlan;
@@ -1092,7 +1094,7 @@ void CreateWidgetWindow()
 	//*********************************************************************************************************************************
 
 	// Time
-	int timeX = x    + 440;
+	int timeX = x    + 410;
 	int timeY = topY + 190;
 	           XPCreateWidget(timeX + 12, timeY + 21, timeX + 18, timeY + 8, 1, "Time", 0, wMainWindow, xpWidgetClass_Caption);
 	wChkTime = XPCreateWidget(timeX - 3, timeY + 24, timeX + 5 , timeY, 1, "", 0, wMainWindow, xpWidgetClass_Button);
@@ -1100,9 +1102,12 @@ void CreateWidgetWindow()
 	XPSetWidgetProperty(wChkTime, xpProperty_ButtonBehavior, xpButtonBehaviorCheckBox);
 	XPSetWidgetProperty(wChkTime, xpProperty_ButtonState, isTimePauseSelected);
 
-	wTextTime = XPCreateWidget(timeX, timeY, timeX + 42, timeY - 23, 1, timePause.c_str(), 0, wMainWindow, xpWidgetClass_TextField);
+	wTextTime = XPCreateWidget(timeX, timeY, timeX + 60, timeY - 23, 1, timePause.c_str(), 0, wMainWindow, xpWidgetClass_TextField);
 	XPSetWidgetProperty(wTextTime, xpProperty_TextFieldType, xpTextEntryField);
-	XPSetWidgetProperty(wTextTime, xpProperty_MaxCharacters, 5);
+	XPSetWidgetProperty(wTextTime, xpProperty_MaxCharacters, 8);
+	timeX += 61;
+	wCaptionTime = XPCreateWidget(timeX, timeY, timeX + 62, timeY - 20, 1, "10:20:20", 0, wMainWindow, xpWidgetClass_Caption);
+	XPSetWidgetProperty(wCaptionTime, xpProperty_CaptionLit, 1);
 	
 
 	//*********************************************************************************************************************************
@@ -1825,7 +1830,10 @@ void getXPlaneDataInfos()
 	// Time
 	hourTimeZ = XPLMGetDatai(XPLMFindDataRef("sim/cockpit2/clock_timer/zulu_time_hours"));
 	minuTimeZ = XPLMGetDatai(XPLMFindDataRef("sim/cockpit2/clock_timer/zulu_time_minutes"));
-	
+	secoTimeZ = XPLMGetDatai(XPLMFindDataRef("sim/cockpit2/clock_timer/zulu_time_seconds"));
+
+	sprintf(label, "%02d:%02d:%02d", hourTimeZ, minuTimeZ, secoTimeZ);
+	XPSetWidgetDescriptor(wCaptionTime, label);
 }
 
 std::string checkSignal(int vlrDir, int vlrEsq) {
@@ -2063,12 +2071,13 @@ float pauseXPlane() {
 	}
 
 	if (isTimePauseSelected) {
-		if (timePause.length() == 5) {
+		if (timePause.length() == 8) {
 			int hourPause = atoi(timePause.substr(0, 2).c_str());
-			int minPause = atoi(timePause.substr(3, 5).c_str());
+			int minPause  = atoi(timePause.substr(3, 5).c_str());
+			int secPause  = atoi(timePause.substr(6, 8).c_str());
 
-			if ( hourPause == hourTimeZ && minPause == minuTimeZ ) {
-				sprintf(msgPause, "Time   ==   %s hrs", timePause.c_str());
+			if ( hourPause == hourTimeZ && minPause == minuTimeZ && secPause == secoTimeZ ) {
+				sprintf(msgPause, "Time reached:  == %s hrs", timePause.c_str());
 				result              = 1;
 				isTimePauseSelected = 0;
 				wChkToUnSelect = wChkTime;
@@ -2126,8 +2135,6 @@ int checkDataRefs(int number) {
 		XPSetWidgetProperty(wCaption, xpProperty_CaptionLit, 1);
 
 		if (s.substr(0, 2) == ">=") {
-			log("aqui");
-
 			signal = ">=";
 			wishedDataRefValue = convertToNumber(s.substr(2));
 
