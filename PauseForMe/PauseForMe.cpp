@@ -6,26 +6,13 @@
 * - Max/Min Distance to DME (Nav1/Nav2/GPS);
 * - Max/Min Time to DME (Nav1/Nav2/GPS);
 * - Max/Min Altitude;
-* - Max/Min Airspeed; or�
+* - Max/Min Airspeed; or
 * - Alignment with a radial signal (Nav1/Nav2)
 *
 * What comes first it will trigger the PAUSE. Then, you have the chance to get back the command from the autopilot from that
 * point on.
 *
-* You could use it while doing another things on computer, like programming your favourite language, or check out what your 8-years-old-boy
-* wants with you, or simply to have a shower, a snack! :-)  I hope it helps, I did it just for fun and because it was features that I was
-* looking for on a plugin, and as I did not find� I decide to write this one.
-*
-* Any doubts or problems you can reach me at my e-mail(below), as soon as I have free time I promised to correct the bugs you found! ;-)
-* Please in case you found any bugs, send me also information of the conditions that it happened. And of course, if you have any ideias to
-* add more cool features, just let me know, right?
-*
 * @author: Ualter Otoni Azambuja Junior (ualter.junior@gmail.com)
-* @where: Sao Paulo, Brazil
-* @when: 09-Aug-2014
-* @why: I liked! Both! Programming and Flying simulator, they are both great!
-* @skills: Java Specialist, Integration and Software development specialist
-* @somethingelse: like to learning new things, new languages and face daring things
 *
 * Aug-09-2014 Beta-v1.0
 * Aug-14-2014 v1.5
@@ -826,7 +813,7 @@ void CreateWidgetWindow()
 	leftX += 15;
 	topYlatLong -= 3;
 	bottomY -= 3;
-	wTextLatitude = XPCreateWidget(leftX, topYlatLong, leftX + 55, bottomY, 1, objUserLatitude.getValorStr().c_str(), 0, wMainWindow, xpWidgetClass_TextField);
+	wTextLatitude = XPCreateWidget(leftX, topYlatLong - 20, leftX + 55, bottomY + 22, 1, objUserLatitude.getValorStr().c_str(), 0, wMainWindow, xpWidgetClass_TextField);
 	XPSetWidgetProperty(wTextLatitude, xpProperty_TextFieldType, xpTextEntryField);
 	XPSetWidgetProperty(wTextLatitude, xpProperty_MaxCharacters, 7);
 	leftX += 58;
@@ -836,7 +823,7 @@ void CreateWidgetWindow()
 	leftX += 12;
 	topYlatLong -= 3;
 	bottomY -= 3;
-	wTextLongitude = XPCreateWidget(leftX, topYlatLong, leftX + 55, bottomY, 1, objUserLongitude.getValorStr().c_str(), 0, wMainWindow, xpWidgetClass_TextField);
+	wTextLongitude = XPCreateWidget(leftX, topYlatLong - 20, leftX + 55, bottomY + 22, 1, objUserLongitude.getValorStr().c_str(), 0, wMainWindow, xpWidgetClass_TextField);
 	XPSetWidgetProperty(wTextLongitude, xpProperty_TextFieldType, xpTextEntryField);
 	XPSetWidgetProperty(wTextLongitude, xpProperty_MaxCharacters, 7);
 
