@@ -20,6 +20,7 @@
 * Aug-28-2014 v2.0 Win64
 * Aug-31-2014 v2.1 Win64
 * Set-04-2014 v2.5 Win64
+* Set-21-2022 v2.9 Win64
 *
 */
 
@@ -141,6 +142,7 @@ static XPWidgetID wDataRef1, wDataRef2, wDataRef3, wDataRefValue1, wDataRefValue
 static XPWidgetID wChkDataRef1, wChkDataRef2, wChkDataRef3;
 static XPWidgetID wCaptionDataRef1, wCaptionDataRef2, wCaptionDataRef3, wTextFlightPlan, wTextTime, wChkTime;
 static XPWidgetID wBtnFpTranslate, wBtnFpBringBackOriginal, wBtnPasteFlightPlan, wBtnCopyFlightPlan, wBtnCleanFlightPlan, wBtnSendFlightPlan, wCaptionTime;
+static XPWidgetID wTextLoadFlightPlan, wBtnLoadFlightPlan, wLoadFlightPlanResult;
 
 int isDataRef1Selected, isDataRef2Selected, isDataRef3Selected;
 
@@ -248,6 +250,7 @@ std::string timePause = "";
 int isTimePauseSelected = 0;
 std::string flightPlan = "";
 std::string flightPlanBringBack = "";
+std::string xplane11LoadFlightPlan = "";
 int hourTimeZ;
 int minuTimeZ;
 int secoTimeZ;
@@ -322,15 +325,18 @@ bool XSBSetTextToClipboard(const std::string& inText);
 void pasteFlightPlan();
 void copyFlightPlan();
 void cleanFlightPlan();
+void readXPlane11FMS();
 
 XPLMCommandRef SetupOnCommand = NULL;
 XPLMCommandRef SetupOffCommand = NULL;
+XPLMCommandRef SetupStartStopTrasmitter = NULL;
 
 std::thread threadTaskSocketServer;
 SocketServer* socketServer;
 
 int SetupOnCommandHandler(XPLMCommandRef inCommand, XPLMCommandPhase inPhase, void * inRefcon);
 int SetupOffCommandHandler(XPLMCommandRef inCommand, XPLMCommandPhase inPhase, void * inRefcon);
+int SetupStartStopTrasmitterHandler(XPLMCommandRef inCommand, XPLMCommandPhase inPhase, void * inRefcon);
 
 using namespace std::placeholders;
 
@@ -353,15 +359,17 @@ PLUGIN_API int XPluginStart(
 		//startSocketServer();
 
 		strcpy(outName, "PauseForMe");
-		strcpy(outSig, "br.sp.ualter.junior.PauseForMe");
-		strcpy(outDesc, "A plug-in to pause at a specific time you want, while you are going to have a shower :-)");
+		strcpy(outSig, "ualter.otoni.PauseForMe");
+		strcpy(outDesc, "A plug-in to pause the X-Plane Flight Simulator at a specific time or event, that you want");
 
 		// Create our commands; these will increment and decrement our custom dataref.
 		SetupOnCommand = XPLMCreateCommand("Ualter/PauseForMe/SetupOn", "Open Setup window");
 		SetupOffCommand = XPLMCreateCommand("Ualter/PauseForMe/SetupOff", "Close Setup window");
+		SetupStartStopTrasmitter = XPLMCreateCommand("Ualter/PauseForMe/StartStopTrasmitter", "START/STOP Transmitter");
 		// Register our custom commands
 		XPLMRegisterCommandHandler(SetupOnCommand, SetupOnCommandHandler, 1, (void *)0);
 		XPLMRegisterCommandHandler(SetupOffCommand, SetupOffCommandHandler, 1, (void *)0);
+		//XPLMRegisterCommandHandler(SetupStartStopTrasmitter, SetupStartStopTrasmitterHandler, 1, (void *)0);
 
 		// Build menu
 		int item;
@@ -466,12 +474,12 @@ void CreateWidgetWindow()
 	int x = left + 100;
 	int y = top  - 100;
 	int w = 940;
-	int h = 490;
+	int h = 509;
 
 	int x2 = x + w;
 	int y2 = y - h;
 
-	wMainWindow = XPCreateWidget(x, y, x2, y2, 1, "Pause For Me / v2.8", 1, NULL, xpWidgetClass_MainWindow);
+	wMainWindow = XPCreateWidget(x, y, x2, y2, 1, "Pause For Me / v2.9", 1, NULL, xpWidgetClass_MainWindow);
 	XPSetWidgetProperty(wMainWindow, xpProperty_MainWindowHasCloseBoxes, 1);
 
 	// Window
@@ -1118,6 +1126,13 @@ void CreateWidgetWindow()
 	XPSetWidgetProperty(wBtnPasteFlightPlan, xpProperty_ButtonType, xpPushButton);
 	wBtnCleanFlightPlan = XPCreateWidget(fpX + 452, fpY - 87, fpX + 552, fpY - 97, 1, "Clean", 0, wMainWindow, xpWidgetClass_Button);
 	XPSetWidgetProperty(wBtnCleanFlightPlan, xpProperty_ButtonType, xpPushButton);
+	// X-Plane 11 Load Flight Plan	
+	XPCreateWidget(fpX - 3, fpY - 102, fpX + 50, fpY - 112, 1, "X-Plane 11 Flight Plan:", 0, wMainWindow, xpWidgetClass_Caption);
+	wTextLoadFlightPlan = XPCreateWidget(fpX + 130, fpY - 99, fpX + 230, fpY - 119, 1, xplane11LoadFlightPlan.c_str(), 0, wMainWindow, xpWidgetClass_TextField);
+	wBtnLoadFlightPlan = XPCreateWidget(fpX + 233, fpY - 105, fpX + 325, fpY - 115, 1, " Load ", 0, wMainWindow, xpWidgetClass_Button);
+	XPSetWidgetProperty(wBtnLoadFlightPlan, xpProperty_ButtonType, xpPushButton);
+	wLoadFlightPlanResult = XPCreateWidget(fpX + 325, fpY - 101, fpX + 420, fpY - 113, 1, "", 0, wMainWindow, xpWidgetClass_Caption);
+	XPSetWidgetProperty(wLoadFlightPlanResult, xpProperty_CaptionLit, 1);
 
 	//*********************************************************************************************************************************
 
@@ -1156,7 +1171,7 @@ void CreateWidgetWindow()
 	//*********************************************************************************************************************************
 	// Just For Debug Purposes
 
-	// Button Reload
+	// Button Reload (For Development Process)
 	leftX += 100;
 	bottomY = topY-heightFields;
 	wBtnReload = XPCreateWidget(leftX, topY-5, leftX+80, bottomY,1,"Reload",0,wMainWindow,xpWidgetClass_Button);
@@ -1242,6 +1257,7 @@ void saveFileValues()
 
 	fileIniWriter << "timePause=" + timePause + "\n";
 	fileIniWriter << "flightPlan=" + flightPlan + "\n";
+	fileIniWriter << "xplane11LoadFlightPlan=" + xplane11LoadFlightPlan + "\n";
 
 	fileIniWriter << "ats_txt=" + pathATSFile + "\n";
 
@@ -1425,6 +1441,11 @@ int widgetWidgetHandler(XPWidgetMessage			inMessage,
 			if (serverSocketStarted) {
 				socketServer->broadcast(jsonFP);
 			}
+		}
+		if (inParam1 == (intptr_t)wBtnLoadFlightPlan)
+		{
+			readXPlane11FMS();
+			return 1;
 		}
 	}
 
@@ -2684,6 +2705,49 @@ PLUGIN_API void XPluginReceiveMessage(XPLMPluginID inFrom, int inMsg, void * inP
 {
 }
 
+
+// Read X-Plane 11 Flightplan file (to send to the clients)
+void readXPlane11FMS() {
+	char bufFp[3070];
+	XPGetWidgetDescriptor(wTextLoadFlightPlan, bufFp, sizeof(bufFp));
+	xplane11LoadFlightPlan = bufFp;
+
+	std::ifstream planFile("c:\\X-Plane 11\\Output\\FMS plans\\" + xplane11LoadFlightPlan + ".fmx");
+	if (planFile.good()) {
+		log("File Plan Found!");
+		std::string waypoints = "";
+		std::string deprwy = "";
+		std::string line;
+		while (std::getline(planFile, line)) {
+			std::string waypoint = "";
+			waypoint = line.substr(0, line.find(","));
+
+			if (strcmp(waypoint.c_str(), "DEPRWY")     == 0 || 
+				strcmp(waypoint.c_str(), "SID")        == 0 || 
+				strcmp(waypoint.c_str(), "STAR")       == 0 || 
+				strcmp(waypoint.c_str(), "APP")        == 0 || 
+				strcmp(waypoint.c_str(), "FLIGHT_NUM") == 0) {
+				break;
+			} else {
+				if (strcmp(waypoints.c_str(), "") == 0) {
+					waypoints = waypoint;
+				} else {
+					waypoints = waypoints + " " + waypoint;
+				}
+			}
+		}
+		XPSetWidgetDescriptor(wTextFlightPlan, "");
+		XPSetWidgetDescriptor(wTextFlightPlan, waypoints.c_str());
+		flightPlan = waypoints;
+		log(waypoints);
+		XPSetWidgetDescriptor(wLoadFlightPlanResult, "LOADED!");
+	}
+	else {
+		log("File Plan " + xplane11LoadFlightPlan + ".fmx Not found!");
+		XPSetWidgetDescriptor(wLoadFlightPlanResult, "Not Found!");
+	}
+}
+
 void checkPreferenceFile() {
 	std::ifstream fileIniReader(fileName.c_str());
 	if (fileIniReader.good()) {
@@ -2850,6 +2914,10 @@ void checkPreferenceFile() {
 				flightPlanBringBack = flightPlan;
 			}
 			else
+			if (strcmp(param.c_str(), "xplane11LoadFlightPlan") == 0) {
+				xplane11LoadFlightPlan = value.c_str();
+			}
+			else
 			if (strcmp(param.c_str(), "ats_txt") == 0) {
 				pathATSFile = value.c_str();
 			}
@@ -2905,6 +2973,7 @@ void checkPreferenceFile() {
 		fileIniWriter << "dataRefValue1=0\n";
 
 		fileIniWriter << "flightPlan=LEBL SLL GIR PPG LFPG\n";
+		fileIniWriter << "xplane11LoadFlightPlan=\n";
 		fileIniWriter << "timePause=22:10\n";
 
 		getPathATSFile();
@@ -2935,6 +3004,12 @@ int SetupOffCommandHandler(XPLMCommandRef inCommand, XPLMCommandPhase inPhase, v
 		XPHideWidget(wMainWindow);
 		MenuItem1 = 0;
 	}
+	return 0;
+}
+
+int SetupStartStopTrasmitterHandler(XPLMCommandRef inCommand, XPLMCommandPhase inPhase, void * inRefcon)
+{
+	switchSocketServer();
 	return 0;
 }
 
