@@ -2717,14 +2717,27 @@ void readXPlane11FMS() {
 		log("File Plan Found!");
 		std::string waypoints = "";
 		std::string deprwy = "";
+		std::string sid = "";
+		std::string star = "";
 		std::string line;
 		while (std::getline(planFile, line)) {
-			std::string waypoint = "";
-			waypoint = line.substr(0, line.find(","));
+			std::string waypoint  = line.substr(0, line.find(","));
+			vector<string> result = splitStringBy(line, ",");
 
-			if (strcmp(waypoint.c_str(), "DEPRWY")     == 0 || 
-				strcmp(waypoint.c_str(), "SID")        == 0 || 
-				strcmp(waypoint.c_str(), "STAR")       == 0 || 
+			if (strcmp(waypoint.c_str(), "DEPRWY") == 0) {
+				if (result.size() > 1) {
+					deprwy = "RWY" + result[1];
+				}
+			} else if (strcmp(waypoint.c_str(), "SID") == 0) {
+				if (result.size() > 1) {
+					sid = "" + result[1];
+				}
+			} else if (strcmp(waypoint.c_str(), "STAR") == 0) {
+				if (result.size() > 1) {
+					star = "" + result[1];
+				}
+			}
+			else if (
 				strcmp(waypoint.c_str(), "APP")        == 0 || 
 				strcmp(waypoint.c_str(), "FLIGHT_NUM") == 0) {
 				break;
@@ -2736,11 +2749,12 @@ void readXPlane11FMS() {
 				}
 			}
 		}
+		log(waypoints);
 		XPSetWidgetDescriptor(wTextFlightPlan, "");
 		XPSetWidgetDescriptor(wTextFlightPlan, waypoints.c_str());
 		flightPlan = waypoints;
-		log(waypoints);
-		XPSetWidgetDescriptor(wLoadFlightPlanResult, "LOADED!");
+		std::string msg = "Loaded! " + deprwy + " " + sid + " " + star;
+		XPSetWidgetDescriptor(wLoadFlightPlanResult, msg.c_str());
 	}
 	else {
 		log("File Plan " + xplane11LoadFlightPlan + ".fmx Not found!");
