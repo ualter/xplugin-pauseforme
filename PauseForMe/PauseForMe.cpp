@@ -2708,6 +2708,20 @@ PLUGIN_API void XPluginReceiveMessage(XPLMPluginID inFrom, int inMsg, void * inP
 
 // Read X-Plane 11 Flightplan file (to send to the clients)
 void readXPlane11FMS() {
+
+	//AQUI
+	/*int totalFMSEntries = XPLMCountFMSEntries();
+	log(convertToString(totalFMSEntries));
+
+	int Index = XPLMGetDisplayedFMSEntry();
+	XPLMNavType outType;
+	char        outID[80];
+	XPLMNavRef  outRef;
+	int         outAltitude;
+	float       outLat, outLon;
+	XPLMGetFMSEntryInfo(Index, &outType, outID, &outRef, &outAltitude, &outLat, &outLon);
+	log(outID);*/
+
 	char bufFp[3070];
 	XPGetWidgetDescriptor(wTextLoadFlightPlan, bufFp, sizeof(bufFp));
 	xplane11LoadFlightPlan = bufFp;
@@ -2719,6 +2733,7 @@ void readXPlane11FMS() {
 		std::string deprwy = "";
 		std::string sid = "";
 		std::string star = "";
+		std::string app = "";
 		std::string line;
 		while (std::getline(planFile, line)) {
 			std::string waypoint  = line.substr(0, line.find(","));
@@ -2736,10 +2751,13 @@ void readXPlane11FMS() {
 				if (result.size() > 1) {
 					star = "" + result[1];
 				}
-			}
-			else if (
-				strcmp(waypoint.c_str(), "APP")        == 0 || 
-				strcmp(waypoint.c_str(), "FLIGHT_NUM") == 0) {
+			} else if (strcmp(waypoint.c_str(), "APP") == 0) {
+				if (result.size() > 1) {
+					app = "" + result[1];
+				}
+			} else if ( 
+				(waypoint.find("FLIGHT_NUM") != std::string::npos) ||
+				(waypoint.find("TRANS")      != std::string::npos) ) {
 				break;
 			} else {
 				if (strcmp(waypoints.c_str(), "") == 0) {
@@ -2753,7 +2771,7 @@ void readXPlane11FMS() {
 		XPSetWidgetDescriptor(wTextFlightPlan, "");
 		XPSetWidgetDescriptor(wTextFlightPlan, waypoints.c_str());
 		flightPlan = waypoints;
-		std::string msg = "Loaded! " + deprwy + " " + sid + " " + star;
+		std::string msg = "OK! " + deprwy + " " + sid + " " + star + " " + app;
 		XPSetWidgetDescriptor(wLoadFlightPlanResult, msg.c_str());
 	}
 	else {
