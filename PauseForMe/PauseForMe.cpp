@@ -1141,12 +1141,12 @@ void CreateWidgetWindow()
 	// Button Save
 	tmpX = 630;
 	leftX = x + tmpX;
-	bottomY = topY - heightFields - 5;
+	bottomY = topY - heightFields - 20;
 	wBtnSave = XPCreateWidget(leftX, topY, leftX + 60, bottomY, 1, "Save", 0, wMainWindow, xpWidgetClass_Button);
 	XPSetWidgetProperty(wBtnSave, xpProperty_ButtonType, xpPushButton);
 	// Button Exit
 	leftX = x + (tmpX + 70);
-	bottomY = topY - heightFields - 5;
+	bottomY = topY - heightFields - 20;
 	wBtnCancel = XPCreateWidget(leftX, topY, leftX + 60, bottomY, 1, "Exit", 0, wMainWindow, xpWidgetClass_Button);
 	XPSetWidgetProperty(wBtnCancel, xpProperty_ButtonType, xpPushButton);
 	// Button Transmitter Switch
@@ -1155,11 +1155,11 @@ void CreateWidgetWindow()
 		btnLabelTransmitter = "STOP Transmitter";
 	}
 	leftX = x + (tmpX + 140);
-	bottomY = topY - heightFields - 5;
+	bottomY = topY - heightFields - 20;
 	wBtnStopStartWebSocket = XPCreateWidget(leftX, topY, leftX + 125, bottomY, 1, btnLabelTransmitter.c_str(), 0, wMainWindow, xpWidgetClass_Button);
 	XPSetWidgetProperty(wBtnStopStartWebSocket, xpProperty_ButtonType, xpPushButton);
 
-	topY -= 28;
+	topY -= 38;
 	leftX = 620;
 	XPWidgetID email = XPCreateWidget(leftX + 233, topY, leftX + 283, topY - 5, 1, "ualter.junior@gmail.com", 0, wMainWindow, xpWidgetClass_Caption);
 	XPSetWidgetProperty(email, xpProperty_CaptionLit, 1);
@@ -1172,10 +1172,10 @@ void CreateWidgetWindow()
 	// Just For Debug Purposes
 
 	// Button Reload (For Development Process)
-	leftX += 100;
+	/*leftX += 100;
 	bottomY = topY-heightFields;
 	wBtnReload = XPCreateWidget(leftX, topY-5, leftX+80, bottomY,1,"Reload",0,wMainWindow,xpWidgetClass_Button);
-	XPSetWidgetProperty(wBtnReload,xpProperty_ButtonType,xpPushButton);
+	XPSetWidgetProperty(wBtnReload,xpProperty_ButtonType,xpPushButton);*/
 	
 	//topY -= 15;
 	//bottomY = topY-heightFields;
